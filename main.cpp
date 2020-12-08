@@ -60,6 +60,14 @@ void TwoPhaseFlow::readParams(std::string path)
 void TwoPhaseFlow::readMesh(std::string path)
 {
     mesh.Load(path);
+
+    Mesh::GeomParam param;
+    param[ORIENTATION]  = FACE;
+    param[MEASURE]      = FACE | CELL;
+    param[BARYCENTER]   = FACE | CELL;
+    param[NORMAL]       = FACE;
+    mesh.PrepareGeometricData(param);
+    mesh.AssignGlobalID(CELL|FACE);
 }
 
 void TwoPhaseFlow::cleanMesh()
@@ -109,6 +117,44 @@ void TwoPhaseFlow::initTags()
     TCoeff   = mesh.CreateTag("TPFA_Coefficient",      DATA_REAL,    FACE, false, 1);
 }
 
+void TwoPhaseFlow::computeTPFAcoeff()
+{
+    for(auto iface = mesh.BeginFace(); iface != mesh.EndFace(); iface++){
+        if(iface->GetStatus() != Element::Ghost){
+            Face face = iface->getAsFace();
+
+            if(face.Boundary()) continue;
+
+            Cell N = face.BackCell();
+            Cell P = face.FrontCell();
+
+            double xP[3], xN[3];
+            P.Barycenter(xP);
+            N.Barycenter(xN);
+
+            double L[3];
+            double diffXnorm2 = 0;
+            for(unsigned i = 0; i < 3; i++)
+                diffXnorm2 += (xP[i] - xN[i])*(xP[i] - xN[i]);
+            for(unsigned i = 0; i < 3; i++)
+                L[i] = (xP[i]-xN[i]) / diffXnorm2;
+
+            double norF[3];
+            face->UnitNormal(norF);
+
+            double coef = L[0]*norF[0] + L[1]*norF[1] + L[2]*norF[2];
+
+            face.Real(TCoeff) = -coef*face.Area();
+        }
+    }
+    mesh.ExchangeData(TCoeff, FACE);
+}
+
+void TwoPhaseFlow::runSimulation()
+{
+    mesh.Save("out.vtk");
+}
+
 int main(int argc, char *argv[])
 {
     if(argc != 3){
@@ -121,6 +167,8 @@ int main(int argc, char *argv[])
     Problem.readMesh(argv[2]);
     Problem.cleanMesh();
     Problem.initTags();
+    Problem.computeTPFAcoeff();
+    Problem.runSimulation();
 
     Mesh::Finalize();
     Solver::Finalize();

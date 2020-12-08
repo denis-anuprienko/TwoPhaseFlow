@@ -5,6 +5,16 @@
 
 using namespace INMOST;
 
+enum{
+    T_ASSEMBLE = 0,
+    T_SOLVE,
+    T_PRECOND,
+    T_LINITER,
+    T_IO,
+    T_INIT,
+    T_UPDATE
+};
+
 class TwoPhaseFlow
 {
 private:
@@ -42,6 +52,9 @@ private:
     // Numerical
     Mesh mesh;
 
+    // Auxiliary
+    double times[7];
+
 public:
     TwoPhaseFlow();
     ~TwoPhaseFlow();
@@ -50,6 +63,8 @@ public:
     void readMesh(std::string path);
     void cleanMesh();
     void initTags();
+    void computeTPFAcoeff();
+    void runSimulation();
 };
 
 #endif // HEADER_H
