@@ -5,7 +5,7 @@ project(TwwoPhase)
 add_executable(MAIN main.cpp)
 
 target_include_directories(MAIN PUBLIC ../INMOST/Source/Headers)
-target_link_libraries(MAIN ../INMOST/build/inmost)
+target_link_libraries(MAIN ../../INMOST/build/inmost)
 
 if(USE_SOLVER)
   if(USE_SOLVER_PETSC)
