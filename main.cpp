@@ -3,12 +3,24 @@
 
 TwoPhaseFlow::TwoPhaseFlow()
 {
+    ttt = Timer();
     setDefaultParams();
+    std::fill_n(times, 7, 0.0);
 }
 
 TwoPhaseFlow::~TwoPhaseFlow()
 {
-
+    printf("+=========================\n");
+    printf("| T_assemble = %lf\n", times[T_ASSEMBLE]);
+    printf("| T_solve    = %lf\n", times[T_SOLVE]);
+    printf("| T_precond  = %lf\n", times[T_PRECOND]);
+    printf("| T_liniter  = %lf\n", times[T_LINITER]);
+    printf("| T_IO       = %lf\n", times[T_IO]);
+    printf("| T_update   = %lf\n", times[T_UPDATE]);
+    printf("| T_init     = %lf\n", times[T_INIT]);
+    printf("+-------------------------\n");
+    printf("| T_total    = %lf\n", Timer() - ttt);
+    printf("+=========================\n");
 }
 
 void TwoPhaseFlow::setDefaultParams()
@@ -32,6 +44,7 @@ void TwoPhaseFlow::setDefaultParams()
 
 void TwoPhaseFlow::readParams(std::string path)
 {
+    double t = Timer();
     std::ifstream file(path);
     std::string line;
     while (getline(file, line))
@@ -55,12 +68,16 @@ void TwoPhaseFlow::readParams(std::string path)
         if(firstword == "vg_a")
             iss >> vg_a;
     }
+    times[T_IO] += Timer() - t;
 }
 
 void TwoPhaseFlow::readMesh(std::string path)
 {
+    double t = Timer();
     mesh.Load(path);
+    times[T_IO] += Timer()-t;
 
+    t = Timer();
     Mesh::GeomParam param;
     param[ORIENTATION]  = FACE;
     param[MEASURE]      = FACE | CELL;
@@ -68,11 +85,13 @@ void TwoPhaseFlow::readMesh(std::string path)
     param[NORMAL]       = FACE;
     mesh.PrepareGeometricData(param);
     mesh.AssignGlobalID(CELL|FACE);
+    times[T_INIT] += Timer() - t;
 }
 
 void TwoPhaseFlow::cleanMesh()
 {
     // Tags that are likely to be on mesh
+    double t = Timer();
     std::vector<std::string> tagNames;
     tagNames.push_back("Liquid_Saturation");
     tagNames.push_back("Liquid_Saturation_Old");
@@ -98,12 +117,14 @@ void TwoPhaseFlow::cleanMesh()
         if(mesh.HaveTag(tagNames[i]))
             mesh.DeleteTag(mesh.GetTag(tagNames[i]));
     }
+    times[T_INIT] += Timer() - t;
 
     //mesh.Save("out.vtk");
 }
 
 void TwoPhaseFlow::initTags()
 {
+    double t = Timer();
     Sl       = mesh.CreateTag("Liquid_Saturation",     DATA_REAL,    CELL, false, 1);
     Pl       = mesh.CreateTag("Liquid_Pressure",       DATA_REAL,    CELL, false, 1);
     Pc       = mesh.CreateTag("Capillary_Pressure",    DATA_REAL,    CELL, false, 1);
@@ -115,10 +136,27 @@ void TwoPhaseFlow::initTags()
     PV       = mesh.CreateTag("Primary_Variable_Type", DATA_INTEGER, CELL, false, 1);
     Sl_old   = mesh.CreateTag("Liquid_Saturation_Old", DATA_REAL,    CELL, false, 1);
     TCoeff   = mesh.CreateTag("TPFA_Coefficient",      DATA_REAL,    FACE, false, 1);
+    Sltmp    = mesh.CreateTag("Sl_tmp",                DATA_REAL,    CELL, false, 1);
+    Xtmp     = mesh.CreateTag("X_tmp",                 DATA_REAL,    CELL, false, 1);
+    Pgtmp    = mesh.CreateTag("Pg_tmp",                DATA_REAL,    CELL, false, 1);
+    Phitmp   = mesh.CreateTag("Phi_tmp",               DATA_REAL,    CELL, false, 1);
+
+    // Some tags don't need to be printed
+    X.SetPrint(false);
+    TCoeff.SetPrint(false);
+    Sl_old.SetPrint(false);
+    Phi_old.SetPrint(false);
+    Sltmp.SetPrint(false);
+    Xtmp.SetPrint(false);
+    Pgtmp.SetPrint(false);
+    Phitmp.SetPrint(false);
+
+    times[T_INIT] += Timer() - t;
 }
 
 void TwoPhaseFlow::computeTPFAcoeff()
 {
+    double t = Timer();
     for(auto iface = mesh.BeginFace(); iface != mesh.EndFace(); iface++){
         if(iface->GetStatus() != Element::Ghost){
             Face face = iface->getAsFace();
@@ -147,12 +185,34 @@ void TwoPhaseFlow::computeTPFAcoeff()
             face.Real(TCoeff) = -coef*face.Area();
         }
     }
+    times[T_ASSEMBLE] += Timer() - t;
     mesh.ExchangeData(TCoeff, FACE);
+}
+
+void TwoPhaseFlow::copyTagReal(Tag Dest, Tag Src, ElementType mask)
+{
+    if(mask & CELL){
+        for(auto icell = mesh.BeginCell(); icell != mesh.EndCell(); icell++){
+            if(icell->GetStatus() == Element::Ghost) continue;
+
+            icell->Real(Dest) = icell->Real(Src);
+        }
+    }
+    if(mask & FACE){
+        for(auto iface = mesh.BeginFace(); iface != mesh.EndFace(); iface++){
+            if(iface->GetStatus() == Element::Ghost) continue;
+
+            iface->Real(Dest) = iface->Real(Src);
+        }
+    }
+    mesh.ExchangeData(Dest, mask);
 }
 
 void TwoPhaseFlow::runSimulation()
 {
+    double t = Timer();
     mesh.Save("out.vtk");
+    times[T_IO] += Timer() - t;
 }
 
 int main(int argc, char *argv[])

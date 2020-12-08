@@ -36,6 +36,9 @@ private:
     double vg_m;
     double phi0;   // Initial porosity
 
+    // Mesh
+    Mesh mesh;
+
     // Tags
     Tag Sl;      // Liquid saturation
     Tag Sl_old;  // Liquid saturation at the previous time step
@@ -49,11 +52,14 @@ private:
     Tag PV;      // Primary variable type indicator
     Tag TCoeff;  // TPFA coefficient for faces
 
-    // Numerical
-    Mesh mesh;
+    Tag Sltmp;   // Temporary tag for Sl
+    Tag Xtmp;    // Temporary tag for Xl
+    Tag Pgtmp;   // Temporary tag for Pg
+    Tag Phitmp;  // Temporary tag for Phi
 
     // Auxiliary
     double times[7];
+    double ttt; // global timer
 
 public:
     TwoPhaseFlow();
@@ -64,6 +70,10 @@ public:
     void cleanMesh();
     void initTags();
     void computeTPFAcoeff();
+    void assembleResidual();
+    void copyTagReal(Tag Dest, Tag Src, ElementType mask);
+    void setInitialConditions();
+    void makeTimeStep();
     void runSimulation();
 };
 
