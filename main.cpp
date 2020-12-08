@@ -6,6 +6,11 @@ TwoPhaseFlow::TwoPhaseFlow()
     setDefaultParams();
 }
 
+TwoPhaseFlow::~TwoPhaseFlow()
+{
+
+}
+
 void TwoPhaseFlow::setDefaultParams()
 {
      K0      = 1e-18;
@@ -57,8 +62,45 @@ void TwoPhaseFlow::readMesh(std::string path)
     mesh.Load(path);
 }
 
-int main(void)
+void TwoPhaseFlow::cleanMesh()
 {
-    printf("Hello world!\n");
+    // Tags that are likely to be on mesh
+    std::vector<std::string> tagNames;
+    tagNames.push_back("Liquid_Saturation");
+    tagNames.push_back("Liquid_Saturation_Old");
+    tagNames.push_back("Gas_Saturation");
+    tagNames.push_back("Gas_Pressure");
+    tagNames.push_back("Liquid_Pressure");
+    tagNames.push_back("Capillary_Pressure");
+    tagNames.push_back("Porosity");
+    tagNames.push_back("Porosity_Old");
+    tagNames.push_back("Fluid_Pressure");
+    tagNames.push_back("Fluid_Pressure_Old");
+    tagNames.push_back("Water_Head");
+    tagNames.push_back("Water_Saturation");
+    tagNames.push_back("Water_Head_Prev");
+    tagNames.push_back("Moisture_Content");
+    tagNames.push_back("_BLK_0_Offset");
+    tagNames.push_back("_BLK_1_Offset");
+    tagNames.push_back("_BLK_2_Offset");
+    tagNames.push_back("Primary_Variable");
+    tagNames.push_back("Primary_Variable_Type");
+
+    for(unsigned i = 0; i < tagNames.size(); i++){
+        if(mesh.HaveTag(tagNames[i]))
+            mesh.DeleteTag(mesh.GetTag(tagNames[i]));
+    }
+
+    //mesh.Save("out.vtk");
+}
+
+int main(int argc, char *argv[])
+{
+    if(argc != 3){
+        std::cout << "Usage: twophase <param_file_path> <mesh_file_path>" << std::endl;
+    }
+    TwoPhaseFlow Problem;
+    Problem.readMesh(argv[2]);
+    Problem.cleanMesh();
     return 0;
 }

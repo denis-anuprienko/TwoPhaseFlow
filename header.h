@@ -35,6 +35,7 @@ public:
     void setDefaultParams();
     void readParams(std::string path);
     void readMesh(std::string path);
+    void cleanMesh();
 };
 
 #endif // HEADER_H
