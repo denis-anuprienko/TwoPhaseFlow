@@ -10,6 +10,11 @@ TwoPhaseFlow::TwoPhaseFlow()
 
 TwoPhaseFlow::~TwoPhaseFlow()
 {
+    delete varX;
+    delete varPg;
+    delete varPhi;
+    delete aut;
+
     printf("+=========================\n");
     printf("| T_assemble = %lf\n", times[T_ASSEMBLE]);
     printf("| T_solve    = %lf\n", times[T_SOLVE]);
@@ -206,6 +211,28 @@ void TwoPhaseFlow::copyTagReal(Tag Dest, Tag Src, ElementType mask)
         }
     }
     mesh.ExchangeData(Dest, mask);
+}
+
+void TwoPhaseFlow::initAutodiff()
+{
+    aut = new Automatizator;
+    Automatizator::MakeCurrent(aut);
+
+    INMOST_DATA_ENUM_TYPE XTagEntryIndex = 0;
+    INMOST_DATA_ENUM_TYPE GasPressureTagEntryIndex = 0;
+    INMOST_DATA_ENUM_TYPE PorosityTagEntryIndex = 0;
+
+    XTagEntryIndex           = aut->RegisterTag(X, CELL);
+    GasPressureTagEntryIndex = aut->RegisterTag(Pg, CELL);
+    PorosityTagEntryIndex    = aut->RegisterTag(Phi, CELL);
+
+    varX   = new dynamic_variable(*aut, XTagEntryIndex);
+    varPg  = new dynamic_variable(*aut, GasPressureTagEntryIndex);
+    varPhi = new dynamic_variable(*aut, PorosityTagEntryIndex);
+    aut->EnumerateEntries();
+
+    Residual R("2phase_full", aut->GetFirstIndex(), aut->GetLastIndex());
+    R.Clear();
 }
 
 void TwoPhaseFlow::runSimulation()

@@ -57,6 +57,12 @@ private:
     Tag Pgtmp;   // Temporary tag for Pg
     Tag Phitmp;  // Temporary tag for Phi
 
+    // Autodiff things
+    Automatizator *aut;
+    dynamic_variable *varX;   // variable X (Sl or Pl)
+    dynamic_variable *varPg;  // variable Pg
+    dynamic_variable *varPhi; // variable Phi
+
     // Auxiliary
     double times[7];
     double ttt; // global timer
@@ -73,6 +79,7 @@ public:
     void assembleResidual();
     void copyTagReal(Tag Dest, Tag Src, ElementType mask);
     void setInitialConditions();
+    void initAutodiff();
     void makeTimeStep();
     void runSimulation();
 };
