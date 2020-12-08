@@ -3,6 +3,11 @@
 
 TwoPhaseFlow::TwoPhaseFlow()
 {
+    setDefaultParams();
+}
+
+void TwoPhaseFlow::setDefaultParams()
+{
      K0      = 1e-18;
      mul     = 1.e-3;
      mug     = 1.e-3;
@@ -45,6 +50,11 @@ void TwoPhaseFlow::readParams(std::string path)
         if(firstword == "vg_a")
             iss >> vg_a;
     }
+}
+
+void TwoPhaseFlow::readMesh(std::string path)
+{
+    mesh.Load(path);
 }
 
 int main(void)

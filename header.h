@@ -27,12 +27,14 @@ private:
     double phi0;   // Initial porosity
 
     // Numerical
-    Mesh *mesh;
+    Mesh mesh;
 
 public:
     TwoPhaseFlow();
     ~TwoPhaseFlow();
+    void setDefaultParams();
     void readParams(std::string path);
+    void readMesh(std::string path);
 };
 
 #endif // HEADER_H
