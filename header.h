@@ -32,6 +32,7 @@ private:
 public:
     TwoPhaseFlow();
     ~TwoPhaseFlow();
+    void readParams(std::string path);
 };
 
 #endif // HEADER_H

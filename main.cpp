@@ -20,6 +20,33 @@ TwoPhaseFlow::TwoPhaseFlow()
      phi0    = 0.16;
 }
 
+void TwoPhaseFlow::readParams(std::string path)
+{
+    std::ifstream file(path);
+    std::string line;
+    while (getline(file, line))
+    {
+        std::istringstream iss(line);
+        std::string firstword;
+        iss >> firstword;
+        if(firstword[0] == '#'){
+            //std::cout << "Found a comment line" << std::endl;
+            continue;
+        }
+
+        if(firstword == "K0")
+            iss >> K0;
+        if(firstword == "c_phi")
+            iss >> c_phi;
+        if(firstword == "vg_n"){
+            iss >> vg_n;
+            vg_m = 1.-1./vg_n;
+        }
+        if(firstword == "vg_a")
+            iss >> vg_a;
+    }
+}
+
 int main(void)
 {
     printf("Hello world!\n");
