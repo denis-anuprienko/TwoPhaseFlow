@@ -94,13 +94,35 @@ void TwoPhaseFlow::cleanMesh()
     //mesh.Save("out.vtk");
 }
 
+void TwoPhaseFlow::initTags()
+{
+    Sl       = mesh.CreateTag("Liquid_Saturation",     DATA_REAL,    CELL, false, 1);
+    Pl       = mesh.CreateTag("Liquid_Pressure",       DATA_REAL,    CELL, false, 1);
+    Pc       = mesh.CreateTag("Capillary_Pressure",    DATA_REAL,    CELL, false, 1);
+    Pg       = mesh.CreateTag("Gas_Pressure",          DATA_REAL,    CELL, false, 1);
+    Pf_old   = mesh.CreateTag("Fluid_Pressure_Old",    DATA_REAL,    CELL, false, 1);
+    X        = mesh.CreateTag("Primary_Variable",      DATA_REAL,    CELL, false, 1);
+    Phi      = mesh.CreateTag("Porosity",              DATA_REAL,    CELL, false, 1);
+    Phi_old  = mesh.CreateTag("Porosity_Old",          DATA_REAL,    CELL, false, 1);
+    PV       = mesh.CreateTag("Primary_Variable_Type", DATA_INTEGER, CELL, false, 1);
+    Sl_old   = mesh.CreateTag("Liquid_Saturation_Old", DATA_REAL,    CELL, false, 1);
+    TCoeff   = mesh.CreateTag("TPFA_Coefficient",      DATA_REAL,    FACE, false, 1);
+}
+
 int main(int argc, char *argv[])
 {
     if(argc != 3){
         std::cout << "Usage: twophase <param_file_path> <mesh_file_path>" << std::endl;
     }
+    Solver::Initialize(&argc,&argv);
+    Mesh::Initialize(&argc,&argv);
+
     TwoPhaseFlow Problem;
     Problem.readMesh(argv[2]);
     Problem.cleanMesh();
+    Problem.initTags();
+
+    Mesh::Finalize();
+    Solver::Finalize();
     return 0;
 }

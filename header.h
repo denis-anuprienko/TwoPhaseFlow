@@ -26,6 +26,19 @@ private:
     double vg_m;
     double phi0;   // Initial porosity
 
+    // Tags
+    Tag Sl;      // Liquid saturation
+    Tag Sl_old;  // Liquid saturation at the previous time step
+    Tag Pl;      // Liquid pressure
+    Tag Pg;      // Gas pressure
+    Tag Pc;      // Capillary pressure
+    Tag Pf_old;  // Phase-averaged fluid pressure at the previous time step
+    Tag Phi;     // Porosity
+    Tag Phi_old; // Porosity at the previous time step
+    Tag X;       // Cellwise variable X (either Sl or Pl)
+    Tag PV;      // Primary variable type indicator
+    Tag TCoeff;  // TPFA coefficient for faces
+
     // Numerical
     Mesh mesh;
 
@@ -36,6 +49,7 @@ public:
     void readParams(std::string path);
     void readMesh(std::string path);
     void cleanMesh();
+    void initTags();
 };
 
 #endif // HEADER_H
