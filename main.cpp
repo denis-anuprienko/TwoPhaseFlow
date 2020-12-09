@@ -11,7 +11,6 @@ TwoPhaseFlow::TwoPhaseFlow()
 
 TwoPhaseFlow::~TwoPhaseFlow()
 {
-    std::cout << "Entering destructor" << std::endl;
     if(aut != nullptr)
         delete aut;
 
@@ -87,7 +86,10 @@ void TwoPhaseFlow::readParams(std::string path)
             iss >> K0;
         if(firstword == "save_dir")
             iss >> save_dir;
+        if(firstword == "problem_name")
+            iss >> problem_name;
     }
+    std::cout << "Problem name is " << problem_name << std::endl;
     times[T_IO] += Timer() - t;
 }
 
@@ -367,6 +369,14 @@ void TwoPhaseFlow::setInitialConditions()
 
         icell->Real(Pg) = Pg0;
         icell->Real(Sl) = Sl0;
+        if(problem_name == "2phase_center"){
+            double x[3];
+            icell->Barycenter(x);
+            double r = (x[0]-0.006)*(x[0]-0.006) + (x[1]-0.006)*(x[1]-0.006);
+            r = sqrt(r);
+            if(r < 0.012 / 6.)
+                icell->Real(Sl) = 0.95;
+        }
         icell->Real(Pl) = icell->Real(Pg) - (get_Pc(icell->Real(Sl))).GetValue();
         icell->Real(Phi) = phi0;
     }
@@ -377,7 +387,6 @@ void TwoPhaseFlow::runSimulation()
 {
     setInitialConditions();
     double t = Timer();
-    //mesh->Save("sol0.vtk");
     mesh->Save(save_dir + "/sol0.vtk");
     times[T_IO] += Timer() - t;
 }
@@ -391,6 +400,7 @@ int main(int argc, char *argv[])
     Mesh::Initialize(&argc,&argv);
 
     TwoPhaseFlow Problem;
+    Problem.readParams(argv[1]);
     Problem.readMesh(argv[2]);
     Problem.cleanMesh();
     Problem.initTags();

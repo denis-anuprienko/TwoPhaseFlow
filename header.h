@@ -46,6 +46,7 @@ private:
 
     double dt;
     std::string save_dir;
+    std::string problem_name; // can be "2phase_center" for a p. with centr. sat. zone
 
     // Mesh
     Mesh mesh_;
