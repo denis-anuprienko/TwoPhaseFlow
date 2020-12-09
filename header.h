@@ -15,6 +15,12 @@ enum{
     T_UPDATE
 };
 
+// Primary variable types
+enum{
+    PV_PRES = 1,
+    PV_SAT
+};
+
 class TwoPhaseFlow
 {
 private:
@@ -34,10 +40,16 @@ private:
     double vg_a;   // van Genuchten pore parameter
     double vg_n;   // van Genuchten pore parameter
     double vg_m;
+    double Sl0;    // Initial liquid saturation
+    double Pg0;    // Initial gas pressure
     double phi0;   // Initial porosity
 
+    double dt;
+    std::string save_dir;
+
     // Mesh
-    Mesh mesh;
+    Mesh mesh_;
+    Mesh *mesh;
 
     // Tags
     Tag Sl;      // Liquid saturation
@@ -59,9 +71,10 @@ private:
 
     // Autodiff things
     Automatizator *aut;
-    dynamic_variable *varX;   // variable X (Sl or Pl)
-    dynamic_variable *varPg;  // variable Pg
-    dynamic_variable *varPhi; // variable Phi
+    dynamic_variable varX;   // variable X (Sl or Pl)
+    dynamic_variable varPg;  // variable Pg
+    dynamic_variable varPhi; // variable Phi
+    Residual R;
 
     // Auxiliary
     double times[7];
@@ -76,6 +89,8 @@ public:
     void cleanMesh();
     void initTags();
     void computeTPFAcoeff();
+    variable get_Sl(variable Pcc);
+    variable get_Pc(variable S);
     void assembleResidual();
     void copyTagReal(Tag Dest, Tag Src, ElementType mask);
     void setInitialConditions();

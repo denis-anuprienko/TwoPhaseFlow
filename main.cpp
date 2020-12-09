@@ -2,18 +2,18 @@
 #include "header.h"
 
 TwoPhaseFlow::TwoPhaseFlow()
+    : aut(), times()
 {
     ttt = Timer();
     setDefaultParams();
-    std::fill_n(times, 7, 0.0);
+    mesh = &mesh_;
 }
 
 TwoPhaseFlow::~TwoPhaseFlow()
 {
-    delete varX;
-    delete varPg;
-    delete varPhi;
-    delete aut;
+    std::cout << "Entering destructor" << std::endl;
+    if(aut != nullptr)
+        delete aut;
 
     printf("+=========================\n");
     printf("| T_assemble = %lf\n", times[T_ASSEMBLE]);
@@ -44,7 +44,12 @@ void TwoPhaseFlow::setDefaultParams()
      vg_a    = 1.0;
      vg_n    = 5;
      vg_m    = 1. - 1./vg_n;
+     Sl0     = 0.1;
+     Pg0     = 1e6;
      phi0    = 0.16;
+
+     dt      = 1e5;
+     save_dir = ".";
 }
 
 void TwoPhaseFlow::readParams(std::string path)
@@ -72,6 +77,16 @@ void TwoPhaseFlow::readParams(std::string path)
         }
         if(firstword == "vg_a")
             iss >> vg_a;
+        if(firstword == "dt")
+            iss >> dt;
+        if(firstword == "Sl0")
+            iss >> Sl0;
+        if(firstword == "Pg0")
+            iss >> Pg0;
+        if(firstword == "phi0")
+            iss >> K0;
+        if(firstword == "save_dir")
+            iss >> save_dir;
     }
     times[T_IO] += Timer() - t;
 }
@@ -79,7 +94,7 @@ void TwoPhaseFlow::readParams(std::string path)
 void TwoPhaseFlow::readMesh(std::string path)
 {
     double t = Timer();
-    mesh.Load(path);
+    mesh->Load(path);
     times[T_IO] += Timer()-t;
 
     t = Timer();
@@ -88,8 +103,8 @@ void TwoPhaseFlow::readMesh(std::string path)
     param[MEASURE]      = FACE | CELL;
     param[BARYCENTER]   = FACE | CELL;
     param[NORMAL]       = FACE;
-    mesh.PrepareGeometricData(param);
-    mesh.AssignGlobalID(CELL|FACE);
+    mesh->PrepareGeometricData(param);
+    mesh->AssignGlobalID(CELL|FACE);
     times[T_INIT] += Timer() - t;
 }
 
@@ -119,32 +134,32 @@ void TwoPhaseFlow::cleanMesh()
     tagNames.push_back("Primary_Variable_Type");
 
     for(unsigned i = 0; i < tagNames.size(); i++){
-        if(mesh.HaveTag(tagNames[i]))
-            mesh.DeleteTag(mesh.GetTag(tagNames[i]));
+        if(mesh->HaveTag(tagNames[i]))
+            mesh->DeleteTag(mesh->GetTag(tagNames[i]));
     }
     times[T_INIT] += Timer() - t;
 
-    //mesh.Save("out.vtk");
+    //mesh->Save("out.vtk");
 }
 
 void TwoPhaseFlow::initTags()
 {
     double t = Timer();
-    Sl       = mesh.CreateTag("Liquid_Saturation",     DATA_REAL,    CELL, false, 1);
-    Pl       = mesh.CreateTag("Liquid_Pressure",       DATA_REAL,    CELL, false, 1);
-    Pc       = mesh.CreateTag("Capillary_Pressure",    DATA_REAL,    CELL, false, 1);
-    Pg       = mesh.CreateTag("Gas_Pressure",          DATA_REAL,    CELL, false, 1);
-    Pf_old   = mesh.CreateTag("Fluid_Pressure_Old",    DATA_REAL,    CELL, false, 1);
-    X        = mesh.CreateTag("Primary_Variable",      DATA_REAL,    CELL, false, 1);
-    Phi      = mesh.CreateTag("Porosity",              DATA_REAL,    CELL, false, 1);
-    Phi_old  = mesh.CreateTag("Porosity_Old",          DATA_REAL,    CELL, false, 1);
-    PV       = mesh.CreateTag("Primary_Variable_Type", DATA_INTEGER, CELL, false, 1);
-    Sl_old   = mesh.CreateTag("Liquid_Saturation_Old", DATA_REAL,    CELL, false, 1);
-    TCoeff   = mesh.CreateTag("TPFA_Coefficient",      DATA_REAL,    FACE, false, 1);
-    Sltmp    = mesh.CreateTag("Sl_tmp",                DATA_REAL,    CELL, false, 1);
-    Xtmp     = mesh.CreateTag("X_tmp",                 DATA_REAL,    CELL, false, 1);
-    Pgtmp    = mesh.CreateTag("Pg_tmp",                DATA_REAL,    CELL, false, 1);
-    Phitmp   = mesh.CreateTag("Phi_tmp",               DATA_REAL,    CELL, false, 1);
+    Sl       = mesh->CreateTag("Liquid_Saturation",     DATA_REAL,    CELL, false, 1);
+    Pl       = mesh->CreateTag("Liquid_Pressure",       DATA_REAL,    CELL, false, 1);
+    Pc       = mesh->CreateTag("Capillary_Pressure",    DATA_REAL,    CELL, false, 1);
+    Pg       = mesh->CreateTag("Gas_Pressure",          DATA_REAL,    CELL, false, 1);
+    Pf_old   = mesh->CreateTag("Fluid_Pressure_Old",    DATA_REAL,    CELL, false, 1);
+    X        = mesh->CreateTag("Primary_Variable",      DATA_REAL,    CELL, false, 1);
+    Phi      = mesh->CreateTag("Porosity",              DATA_REAL,    CELL, false, 1);
+    Phi_old  = mesh->CreateTag("Porosity_Old",          DATA_REAL,    CELL, false, 1);
+    PV       = mesh->CreateTag("Primary_Variable_Type", DATA_INTEGER, CELL, false, 1);
+    Sl_old   = mesh->CreateTag("Liquid_Saturation_Old", DATA_REAL,    CELL, false, 1);
+    TCoeff   = mesh->CreateTag("TPFA_Coefficient",      DATA_REAL,    FACE, false, 1);
+    Sltmp    = mesh->CreateTag("Sl_tmp",                DATA_REAL,    CELL, false, 1);
+    Xtmp     = mesh->CreateTag("X_tmp",                 DATA_REAL,    CELL, false, 1);
+    Pgtmp    = mesh->CreateTag("Pg_tmp",                DATA_REAL,    CELL, false, 1);
+    Phitmp   = mesh->CreateTag("Phi_tmp",               DATA_REAL,    CELL, false, 1);
 
     // Some tags don't need to be printed
     X.SetPrint(false);
@@ -162,7 +177,7 @@ void TwoPhaseFlow::initTags()
 void TwoPhaseFlow::computeTPFAcoeff()
 {
     double t = Timer();
-    for(auto iface = mesh.BeginFace(); iface != mesh.EndFace(); iface++){
+    for(auto iface = mesh->BeginFace(); iface != mesh->EndFace(); iface++){
         if(iface->GetStatus() != Element::Ghost){
             Face face = iface->getAsFace();
 
@@ -191,26 +206,26 @@ void TwoPhaseFlow::computeTPFAcoeff()
         }
     }
     times[T_ASSEMBLE] += Timer() - t;
-    mesh.ExchangeData(TCoeff, FACE);
+    mesh->ExchangeData(TCoeff, FACE);
 }
 
 void TwoPhaseFlow::copyTagReal(Tag Dest, Tag Src, ElementType mask)
 {
     if(mask & CELL){
-        for(auto icell = mesh.BeginCell(); icell != mesh.EndCell(); icell++){
+        for(auto icell = mesh->BeginCell(); icell != mesh->EndCell(); icell++){
             if(icell->GetStatus() == Element::Ghost) continue;
 
             icell->Real(Dest) = icell->Real(Src);
         }
     }
     if(mask & FACE){
-        for(auto iface = mesh.BeginFace(); iface != mesh.EndFace(); iface++){
+        for(auto iface = mesh->BeginFace(); iface != mesh->EndFace(); iface++){
             if(iface->GetStatus() == Element::Ghost) continue;
 
             iface->Real(Dest) = iface->Real(Src);
         }
     }
-    mesh.ExchangeData(Dest, mask);
+    mesh->ExchangeData(Dest, mask);
 }
 
 void TwoPhaseFlow::initAutodiff()
@@ -226,19 +241,144 @@ void TwoPhaseFlow::initAutodiff()
     GasPressureTagEntryIndex = aut->RegisterTag(Pg, CELL);
     PorosityTagEntryIndex    = aut->RegisterTag(Phi, CELL);
 
-    varX   = new dynamic_variable(*aut, XTagEntryIndex);
-    varPg  = new dynamic_variable(*aut, GasPressureTagEntryIndex);
-    varPhi = new dynamic_variable(*aut, PorosityTagEntryIndex);
+    varX   = dynamic_variable(*aut, XTagEntryIndex);
+    varPg  = dynamic_variable(*aut, GasPressureTagEntryIndex);
+    varPhi = dynamic_variable(*aut, PorosityTagEntryIndex);
     aut->EnumerateEntries();
 
-    Residual R("2phase_full", aut->GetFirstIndex(), aut->GetLastIndex());
+    R = Residual("2phase_full", aut->GetFirstIndex(), aut->GetLastIndex());
     R.Clear();
+}
+
+variable TwoPhaseFlow::get_Sl(variable Pcc)
+{
+    if(Pcc.GetValue() < 0.0)
+        return 1.0;
+    return pow(1.0 + pow(vg_a/rhol/g*Pcc, vg_n), -vg_m);
+}
+
+variable TwoPhaseFlow::get_Pc(variable S)
+{
+    if(S.GetValue() < 0.0 || S.GetValue() > 1.0){
+        mesh->Save("err.vtk");
+        std::cout << "Bad saturation " << S.GetValue() << std::endl;
+        exit(1);
+    }
+    return rhol*9.81/vg_a * pow(pow(S,-1./vg_m) - 1., 1./vg_n);
+}
+
+void TwoPhaseFlow::assembleResidual()
+{
+    for(auto icell = mesh->BeginCell(); icell != mesh->EndCell(); icell++){
+        if(icell->GetStatus() == Element::Ghost) continue;
+        Cell cellP = icell->getAsCell();
+
+        // Values needed for accumulation part
+        variable SP, Pf, PlP, massL, massG;
+        double SPn, massL_old, massG_old;
+        SPn = cellP.Real(Sl_old);
+
+        double V = cellP.Volume();
+
+        if(cellP.Integer(PV) == PV_PRES){
+            PlP = varX(cellP);
+            variable Pcc = varPg(cellP) - PlP;
+            SP = get_Sl(Pcc);
+        }
+        else{
+            // Saturation formulation, X is Sl
+            SP = varX(cellP);
+            PlP = varPg(cellP) - get_Pc(SP);
+        }
+
+
+        massL         = rhol *     SP   * varPhi(cellP);
+        massG         = rhog * (1.-SP)  * varPhi(cellP);
+        massL_old     = rhol *     SPn  * cellP.Real(Phi_old);
+        massG_old     = rhol * (1.-SPn) * cellP.Real(Phi_old);
+
+        Pf            = SP * PlP + (1.-SP) * varPg(cellP);
+
+        R[varX.Index(cellP)]   = (massL - massL_old)/dt;// * V;
+        R[varPg.Index(cellP)]  = (massG - massG_old)/dt;// * V;
+        //R[varPg.Index(cellP)]  = varPg(cellP) - 1e6;
+
+        R[varPhi.Index(cellP)] = (varPhi(cellP) - cellP.Real(Phi_old))/dt - c_phi*(Pf - cellP.Real(Pf_old))/dt;
+        //R[varPhi.Index(cellP)] *= V;
+
+        if(cellP->GetStatus() != Element::Ghost){
+            auto faces = cellP->getFaces();
+            // Loop over cell faces
+            for(auto iface = faces.begin(); iface != faces.end(); iface++){
+                Face face = iface->getAsFace();
+                if(face.Boundary()){
+
+                }
+                else{ // Internal face
+                    Cell cellN;
+                    if(cellP == face->BackCell())
+                        cellN = face->FrontCell();
+                    else{
+                        cellN = face->BackCell();
+                    }
+                    if(cellP == cellN){
+                        std::cout << "P == N" << std::endl;
+                        exit(1);
+                    }
+
+                    double coef = face.Real(TCoeff);
+
+
+                    variable PlN, SN, Krl, Krg, ql, qg;
+                    // Liquid pressure for cell N
+                    if(cellN.Integer(PV) == PV_PRES){
+                        PlN = varX(cellN);
+                        variable Pcc = varPg(cellN) - PlN;
+                        SN = get_Sl(Pcc);
+                    }
+                    else{ // X is Sl
+                        SN = varX(cellN);
+                        PlN = varPg(cellN) - get_Pc(SN);
+                    }
+
+
+                    Krl = 0.5 * (SP*SP + SN*SN);
+                    Krg = 0.5 * ((1.-SP)*(1.-SP) + (1.-SN)*(1.-SN));
+
+                    if(Krg.GetValue() < 1e-9)
+                        Krg = 1e-9;
+
+                    ql = -rhol*Krl*K0/mul * coef * (PlP - PlN);
+                    qg = -rhog*Krg*K0/mug * coef * (varPg(cellP) - varPg(cellN));
+
+                    R[varX.Index(cellP)] += ql/V;
+                    R[varPg.Index(cellP)] += qg/V;
+                }
+            }
+        }
+    }
+}
+
+void TwoPhaseFlow::setInitialConditions()
+{
+    double t = Timer();
+    for(auto icell = mesh->BeginCell(); icell != mesh->EndCell(); icell++){
+        if(icell->GetStatus() == Element::Ghost) continue;
+
+        icell->Real(Pg) = Pg0;
+        icell->Real(Sl) = Sl0;
+        icell->Real(Pl) = icell->Real(Pg) - (get_Pc(icell->Real(Sl))).GetValue();
+        icell->Real(Phi) = phi0;
+    }
+    times[T_INIT] += Timer() - t;
 }
 
 void TwoPhaseFlow::runSimulation()
 {
+    setInitialConditions();
     double t = Timer();
-    mesh.Save("out.vtk");
+    //mesh->Save("sol0.vtk");
+    mesh->Save(save_dir + "/sol0.vtk");
     times[T_IO] += Timer() - t;
 }
 
