@@ -49,6 +49,8 @@ private:
     std::string problem_name; // can be "2phase_center" for a p. with centr. sat. zone
     int maxit;
     double rtol, atol;
+    std::string solver_type;
+    double w;                 // relaxation parameter
 
     // Mesh
     Mesh mesh_;
@@ -80,9 +82,14 @@ private:
     dynamic_variable varPhi; // variable Phi
     Residual R;
 
+    // Solver
+    Solver *S;
+
     // Auxiliary
     double times[7];
     double ttt; // global timer
+    int iterLinear;
+    int iterNewton;
 
 public:
     TwoPhaseFlow();

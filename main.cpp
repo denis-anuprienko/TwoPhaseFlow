@@ -2,7 +2,7 @@
 #include "header.h"
 
 TwoPhaseFlow::TwoPhaseFlow()
-    : aut(), times()
+    : aut(), times(), iterLinear(0), iterNewton(0)
 {
     ttt = Timer();
     setDefaultParams();
@@ -14,7 +14,10 @@ TwoPhaseFlow::~TwoPhaseFlow()
     if(aut != nullptr)
         delete aut;
 
-    printf("+=========================\n");
+    std::cout << "Newton iterations: " << iterNewton << std::endl;
+    std::cout << "Linear iterations: " << iterLinear << std::endl;
+
+    printf("\n+=========================\n");
     printf("| T_assemble = %lf\n", times[T_ASSEMBLE]);
     printf("| T_solve    = %lf\n", times[T_SOLVE]);
     printf("| T_precond  = %lf\n", times[T_PRECOND]);
@@ -53,6 +56,8 @@ void TwoPhaseFlow::setDefaultParams()
      rtol    = 1e-6;
      atol    = 1e-9;
      save_dir = ".";
+     solver_type = "inner_ilu2";
+     w      = 1.0;
 }
 
 void TwoPhaseFlow::readParams(std::string path)
@@ -83,7 +88,7 @@ void TwoPhaseFlow::readParams(std::string path)
         if(firstword == "dt")
             iss >> dt;
         if(firstword == "T")
-            iss >> dt;
+            iss >> T;
         if(firstword == "Sl0")
             iss >> Sl0;
         if(firstword == "Pg0")
@@ -100,6 +105,10 @@ void TwoPhaseFlow::readParams(std::string path)
             iss >> rtol;
         if(firstword == "atol")
             iss >> atol;
+        if(firstword == "solver_type")
+            iss >> solver_type;
+        if(firstword == "relax_param")
+            iss >> w;
     }
     //std::cout << "Problem name is " << problem_name << std::endl;
     times[T_IO] += Timer() - t;
@@ -213,7 +222,7 @@ void TwoPhaseFlow::computeTPFAcoeff()
                 L[i] = (xP[i]-xN[i]) / diffXnorm2;
 
             double norF[3];
-            face->UnitNormal(norF);
+            face.UnitNormal(norF);
 
             double coef = L[0]*norF[0] + L[1]*norF[1] + L[2]*norF[2];
 
@@ -286,42 +295,36 @@ variable TwoPhaseFlow::get_Pc(variable S)
 
 void TwoPhaseFlow::assembleResidual()
 {
+    double t = Timer();
     for(auto icell = mesh->BeginCell(); icell != mesh->EndCell(); icell++){
         if(icell->GetStatus() == Element::Ghost) continue;
         Cell cellP = icell->getAsCell();
 
         // Values needed for accumulation part
-        variable SP, Pf, PlP, massL, massG;
+        variable SP, Pf, Pl, massL, massG;
         double SPn, massL_old, massG_old;
         SPn = cellP.Real(Sl_old);
 
         double V = cellP.Volume();
 
-        if(!cellP.isValid()){
-            std::cout << "Invalid cell" << std::endl;
-        }
-
         if(cellP.Integer(PV) == PV_PRES){
-            PlP = varX(cellP);
-            variable Pcc = varPg(cellP) - PlP;
+            Pl = varX(cellP);
+            variable Pcc = varPg(cellP) - Pl;
             SP = get_Sl(Pcc);
         }
-        else if(cellP.Integer(PV) == PV_SAT){
+        else{
             // Saturation formulation, X is Sl
             SP = varX(cellP);
-            PlP = varPg(cellP) - get_Pc(SP);
+            Pl = varPg(cellP) - get_Pc(SP);
         }
-        else{
-            std::cout << "Undefined PV type at cell " << cellP.GlobalID() << std::endl;
-            exit(1);
-        }
+
 
         massL         = rhol *     SP   * varPhi(cellP);
         massG         = rhog * (1.-SP)  * varPhi(cellP);
         massL_old     = rhol *     SPn  * cellP.Real(Phi_old);
         massG_old     = rhol * (1.-SPn) * cellP.Real(Phi_old);
 
-        Pf            = SP * PlP + (1.-SP) * varPg(cellP);
+        Pf            = SP * Pl + (1.-SP) * varPg(cellP);
 
         R[varX.Index(cellP)]   = (massL - massL_old)/dt;// * V;
         R[varPg.Index(cellP)]  = (massG - massG_old)/dt;// * V;
@@ -345,15 +348,24 @@ void TwoPhaseFlow::assembleResidual()
                     else{
                         cellN = face->BackCell();
                     }
-                    if(cellP == cellN){
-                        std::cout << "P == N" << std::endl;
+                    if(cellP == cellN)
                         exit(1);
-                    }
 
                     double coef = face.Real(TCoeff);
 
 
-                    variable PlN, SN, Krl, Krg, ql, qg;
+                    variable PlP, PlN, SP, SN, Krl, Krg, ql, qg;
+
+                    // Liquid pressure for cell P
+                    if(cellP.Integer(PV) == PV_PRES){
+                        PlP = varX(cellP);
+                        variable Pcc = varPg(cellP) - PlP;
+                        SP = get_Sl(Pcc);
+                    }
+                    else{ // X is Sl
+                        SP = varX(cellP);
+                        PlP = varPg(cellP) - get_Pc(SP);
+                    }
                     // Liquid pressure for cell N
                     if(cellN.Integer(PV) == PV_PRES){
                         PlN = varX(cellN);
@@ -381,6 +393,7 @@ void TwoPhaseFlow::assembleResidual()
             }
         }
     }
+    times[T_ASSEMBLE] += Timer() - t;
 }
 
 void TwoPhaseFlow::setInitialConditions()
@@ -390,14 +403,14 @@ void TwoPhaseFlow::setInitialConditions()
         if(icell->GetStatus() == Element::Ghost) continue;
 
         icell->Real(Pg) = Pg0;
-        icell->Real(Sl) = Sl0;
+        icell->Real(Sl) = 0.01;
         if(problem_name == "2phase_center"){
             double x[3];
             icell->Barycenter(x);
             double r = (x[0]-0.006)*(x[0]-0.006) + (x[1]-0.006)*(x[1]-0.006);
             r = sqrt(r);
             if(r < 0.012 / 6.)
-                icell->Real(Sl) = 0.95;
+                icell->Real(Sl) = Sl0;
         }
         double S = icell->Real(Sl);
         icell->Real(Pl) = icell->Real(Pg) - (get_Pc(S)).GetValue();
@@ -422,6 +435,8 @@ void TwoPhaseFlow::setPrimaryVariables()
             icell->Real(X) = icell->Real(Sl);
         }
     }
+    mesh->ExchangeData(PV, CELL);
+    mesh->ExchangeData(X, CELL);
 }
 
 void TwoPhaseFlow::makeTimeStep()
@@ -432,9 +447,14 @@ void TwoPhaseFlow::makeTimeStep()
     copyTagReal(Phi_old, Phi, CELL);
 
     double r2, r2_0;
+    double t;
 
-    std::cout << std::endl << "Newton: maxit = " << maxit;
+    Sparse::Vector sol("Newton_sol", aut->GetFirstIndex(), aut->GetLastIndex());
+
+    std::cout << "Newton: maxit = " << maxit;
     std::cout << ", rtol = " << rtol << ", atol = " << atol << std::endl;
+    std::cout << "Solver: " << solver_type << std::endl;
+    bool converged = false;
     for(int iter = 0; iter < maxit; iter++){
         setPrimaryVariables();
         assembleResidual();
@@ -443,6 +463,54 @@ void TwoPhaseFlow::makeTimeStep()
         if(iter == 0)
             r2_0 = r2;
         std::cout << " iter " << iter << ", |r|_2 = " << r2 << std::endl;
+
+        if(r2 < atol || r2 < rtol*r2_0){
+            converged = true;
+            std::cout << "Converged" << std::endl;
+            break;
+        }
+
+        t = Timer();
+        S->SetMatrix(R.GetJacobian());
+        times[T_PRECOND] += Timer() - t;
+
+        t = Timer();
+        bool solved = S->Solve(R.GetResidual(), sol);
+        if(!solved){
+            std::cout << "Linear solver failed: " << S->GetReason();
+        }
+        iterLinear += S->Iterations();
+        times[T_SOLVE] += Timer() - t;
+
+        t = Timer();
+        for(auto icell = mesh->BeginCell(); icell != mesh->EndCell(); icell++){
+            if(icell->GetStatus() == Element::Ghost) continue;
+
+            Cell cell = icell->getAsCell();
+            cell.Real(Pg) -= w*sol[varPg.Index(cell)];
+            if(cell.Integer(PV) == PV_SAT){
+                double Snew = cell.Real(Sl) - w*sol[varX.Index(cell)];
+                cell.Real(Pc) = get_Pc(Snew).GetValue();
+                cell.Real(Pl) = cell.Real(Pg) - cell.Real(Pc);
+                cell.Real(Sl) = Snew;
+            }
+            else{
+                cell.Real(Pl) -= w*sol[varX.Index(cell)];
+                cell.Real(Pc) = cell.Real(Pg) - cell.Real(Pl);
+                cell.Real(Sl) = get_Sl(cell.Real(Pc)).GetValue();
+            }
+            cell.Real(Phi) -= sol[varPhi.Index(cell)];
+        }
+        times[T_UPDATE] += Timer() - t;
+        mesh->ExchangeData(Pl, CELL);
+        mesh->ExchangeData(Pg, CELL);
+        mesh->ExchangeData(Sl, CELL);
+        mesh->ExchangeData(Phi, CELL);
+        iterNewton++;
+    }
+    if(!converged){
+        std::cout << "Newton failed" << std::endl;
+        exit(1);
     }
 }
 
@@ -455,11 +523,22 @@ void TwoPhaseFlow::runSimulation()
 
     initAutodiff();
 
+    S = new Solver(solver_type);
+    S->SetParameter("absolute_tolerance","1e-14");
+    S->SetParameter("relative_tolerance","1e-10");
+
     int nt = static_cast<int>(T/dt);
     for(int it = 1; it <= nt; it++){
+        std::cout << std::endl;
         std::cout << "===== TIME STEP " << it << ", T = " << it*dt << " =====" << std::endl;
         makeTimeStep();
+
+        t = Timer();
+        mesh->Save(save_dir + "/sol" + std::to_string(it) + ".vtk");
+        times[T_IO] += Timer() - t;
     }
+
+    delete S;
 }
 
 int main(int argc, char *argv[])
