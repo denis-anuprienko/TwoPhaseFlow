@@ -154,6 +154,7 @@ void TwoPhaseFlow::initTags()
     Pl       = mesh->CreateTag("Liquid_Pressure",       DATA_REAL,    CELL, false, 1);
     Pc       = mesh->CreateTag("Capillary_Pressure",    DATA_REAL,    CELL, false, 1);
     Pg       = mesh->CreateTag("Gas_Pressure",          DATA_REAL,    CELL, false, 1);
+    Pf       = mesh->CreateTag("Fluid_Pressure",        DATA_REAL,    CELL, false, 1);
     Pf_old   = mesh->CreateTag("Fluid_Pressure_Old",    DATA_REAL,    CELL, false, 1);
     X        = mesh->CreateTag("Primary_Variable",      DATA_REAL,    CELL, false, 1);
     Phi      = mesh->CreateTag("Porosity",              DATA_REAL,    CELL, false, 1);
@@ -380,7 +381,9 @@ void TwoPhaseFlow::setInitialConditions()
             if(r < 0.012 / 6.)
                 icell->Real(Sl) = 0.95;
         }
-        icell->Real(Pl) = icell->Real(Pg) - (get_Pc(icell->Real(Sl))).GetValue();
+        double S = icell->Real(Sl);
+        icell->Real(Pl) = icell->Real(Pg) - (get_Pc(S)).GetValue();
+        icell->Real(Pf) = S * icell->Real(Pl) + (1.-S) * icell->Real(Pg);
         icell->Real(Phi) = phi0;
     }
     times[T_INIT] += Timer() - t;
@@ -388,7 +391,10 @@ void TwoPhaseFlow::setInitialConditions()
 
 void TwoPhaseFlow::makeTimeStep()
 {
-
+    // Save old values
+    copyTagReal(Sl_old, Sl, CELL);
+    copyTagReal(Pf_old, Pf, CELL);
+    copyTagReal(Phi_old, Phi, CELL);
 }
 
 void TwoPhaseFlow::runSimulation()
@@ -401,6 +407,7 @@ void TwoPhaseFlow::runSimulation()
     int nt = static_cast<int>(T/dt);
     for(int it = 1; it <= nt; it++){
         std::cout << "===== TIME STEP " << it << ", T = " << it*dt << " =====" << std::endl;
+        makeTimeStep();
     }
 }
 

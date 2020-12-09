@@ -58,6 +58,7 @@ private:
     Tag Pl;      // Liquid pressure
     Tag Pg;      // Gas pressure
     Tag Pc;      // Capillary pressure
+    Tag Pf;      // Phase-averaged fluid pressure
     Tag Pf_old;  // Phase-averaged fluid pressure at the previous time step
     Tag Phi;     // Porosity
     Tag Phi_old; // Porosity at the previous time step
