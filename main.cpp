@@ -49,6 +49,9 @@ void TwoPhaseFlow::setDefaultParams()
 
      dt      = 1e5;
      T       = 3e5;
+     maxit   = 20;
+     rtol    = 1e-6;
+     atol    = 1e-9;
      save_dir = ".";
 }
 
@@ -91,6 +94,12 @@ void TwoPhaseFlow::readParams(std::string path)
             iss >> save_dir;
         if(firstword == "problem_name")
             iss >> problem_name;
+        if(firstword == "maxit")
+            iss >> maxit;
+        if(firstword == "rtol")
+            iss >> rtol;
+        if(firstword == "atol")
+            iss >> atol;
     }
     //std::cout << "Problem name is " << problem_name << std::endl;
     times[T_IO] += Timer() - t;
@@ -236,6 +245,7 @@ void TwoPhaseFlow::copyTagReal(Tag Dest, Tag Src, ElementType mask)
 
 void TwoPhaseFlow::initAutodiff()
 {
+    double t = Timer();
     aut = new Automatizator;
     Automatizator::MakeCurrent(aut);
 
@@ -254,6 +264,7 @@ void TwoPhaseFlow::initAutodiff()
 
     R = Residual("2phase_full", aut->GetFirstIndex(), aut->GetLastIndex());
     R.Clear();
+    times[T_INIT] += Timer() - t;
 }
 
 variable TwoPhaseFlow::get_Sl(variable Pcc)
@@ -286,17 +297,24 @@ void TwoPhaseFlow::assembleResidual()
 
         double V = cellP.Volume();
 
+        if(!cellP.isValid()){
+            std::cout << "Invalid cell" << std::endl;
+        }
+
         if(cellP.Integer(PV) == PV_PRES){
             PlP = varX(cellP);
             variable Pcc = varPg(cellP) - PlP;
             SP = get_Sl(Pcc);
         }
-        else{
+        else if(cellP.Integer(PV) == PV_SAT){
             // Saturation formulation, X is Sl
             SP = varX(cellP);
             PlP = varPg(cellP) - get_Pc(SP);
         }
-
+        else{
+            std::cout << "Undefined PV type at cell " << cellP.GlobalID() << std::endl;
+            exit(1);
+        }
 
         massL         = rhol *     SP   * varPhi(cellP);
         massG         = rhog * (1.-SP)  * varPhi(cellP);
@@ -389,12 +407,43 @@ void TwoPhaseFlow::setInitialConditions()
     times[T_INIT] += Timer() - t;
 }
 
+void TwoPhaseFlow::setPrimaryVariables()
+{
+    for(auto icell = mesh->BeginCell(); icell != mesh->EndCell(); icell++){
+        if(icell->GetStatus() == Element::Ghost) continue;
+
+        // Hardcoded values for now...
+        if(icell->Real(Sl) > 0.9){
+            icell->Integer(PV) = PV_PRES;
+            icell->Real(X) = icell->Real(Pl);
+        }
+        else{
+            icell->Integer(PV) = PV_SAT;
+            icell->Real(X) = icell->Real(Sl);
+        }
+    }
+}
+
 void TwoPhaseFlow::makeTimeStep()
 {
     // Save old values
     copyTagReal(Sl_old, Sl, CELL);
     copyTagReal(Pf_old, Pf, CELL);
     copyTagReal(Phi_old, Phi, CELL);
+
+    double r2, r2_0;
+
+    std::cout << std::endl << "Newton: maxit = " << maxit;
+    std::cout << ", rtol = " << rtol << ", atol = " << atol << std::endl;
+    for(int iter = 0; iter < maxit; iter++){
+        setPrimaryVariables();
+        assembleResidual();
+
+        r2 = R.Norm();
+        if(iter == 0)
+            r2_0 = r2;
+        std::cout << " iter " << iter << ", |r|_2 = " << r2 << std::endl;
+    }
 }
 
 void TwoPhaseFlow::runSimulation()
@@ -403,6 +452,8 @@ void TwoPhaseFlow::runSimulation()
     double t = Timer();
     mesh->Save(save_dir + "/sol0.vtk");
     times[T_IO] += Timer() - t;
+
+    initAutodiff();
 
     int nt = static_cast<int>(T/dt);
     for(int it = 1; it <= nt; it++){

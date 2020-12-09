@@ -47,6 +47,8 @@ private:
     double dt, T;
     std::string save_dir;
     std::string problem_name; // can be "2phase_center" for a p. with centr. sat. zone
+    int maxit;
+    double rtol, atol;
 
     // Mesh
     Mesh mesh_;
@@ -96,6 +98,7 @@ public:
     void assembleResidual();
     void copyTagReal(Tag Dest, Tag Src, ElementType mask);
     void setInitialConditions();
+    void setPrimaryVariables();
     void initAutodiff();
     void makeTimeStep();
     void runSimulation();
