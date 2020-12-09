@@ -184,6 +184,8 @@ void TwoPhaseFlow::initTags()
     Xtmp     = mesh->CreateTag("X_tmp",                 DATA_REAL,    CELL, false, 1);
     Pgtmp    = mesh->CreateTag("Pg_tmp",                DATA_REAL,    CELL, false, 1);
     Phitmp   = mesh->CreateTag("Phi_tmp",               DATA_REAL,    CELL, false, 1);
+    BCtype   = mesh->CreateTag("BCtype",                DATA_INTEGER, FACE, FACE,  2);
+    BCval    = mesh->CreateTag("BCval",                 DATA_REAL,    FACE, FACE,  2);
 
     // Some tags don't need to be printed
     X.SetPrint(false);
@@ -420,6 +422,25 @@ void TwoPhaseFlow::setInitialConditions()
     times[T_INIT] += Timer() - t;
 }
 
+void TwoPhaseFlow::setBoundaryConditions()
+{
+    double t = Timer();
+    for(auto iface = mesh->BeginFace(); iface != mesh->EndFace(); iface++){
+        if(iface->GetStatus() == Element::Ghost) continue;
+
+        Face face = iface->getAsFace();
+        if(!face.Boundary())
+            continue;
+        double x[3];
+        face.Barycenter(x);
+        if(fabs(x[2]-0.012) < 1e-15){
+            face.IntegerArray(BCtype)[BCAT_L] = BC_NEUM;
+            face.RealArray(BCval)[BCAT_L] = 1e-3;
+        }
+    }
+    times[T_INIT] += Timer() - t;
+}
+
 void TwoPhaseFlow::setPrimaryVariables()
 {
     for(auto icell = mesh->BeginCell(); icell != mesh->EndCell(); icell++){
@@ -517,6 +538,7 @@ void TwoPhaseFlow::makeTimeStep()
 void TwoPhaseFlow::runSimulation()
 {
     setInitialConditions();
+    setBoundaryConditions();
     double t = Timer();
     mesh->Save(save_dir + "/sol0.vtk");
     times[T_IO] += Timer() - t;

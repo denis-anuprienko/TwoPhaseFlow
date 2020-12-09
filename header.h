@@ -21,6 +21,18 @@ enum{
     PV_SAT
 };
 
+// BC type
+enum{
+    BC_DIR = 1,
+    BC_NEUM
+};
+
+// BC category: liquid or gas
+enum{
+    BCAT_L = 1,
+    BCAT_G
+};
+
 class TwoPhaseFlow
 {
 private:
@@ -75,6 +87,9 @@ private:
     Tag Pgtmp;   // Temporary tag for Pg
     Tag Phitmp;  // Temporary tag for Phi
 
+    Tag BCtype;  // BC type: Neumann, Dirichlet
+    Tag BCval;   // BC value: pressure or flux
+
     // Autodiff things
     Automatizator *aut;
     dynamic_variable varX;   // variable X (Sl or Pl)
@@ -105,6 +120,7 @@ public:
     void assembleResidual();
     void copyTagReal(Tag Dest, Tag Src, ElementType mask);
     void setInitialConditions();
+    void setBoundaryConditions();
     void setPrimaryVariables();
     void initAutodiff();
     void makeTimeStep();
