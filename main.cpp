@@ -48,6 +48,7 @@ void TwoPhaseFlow::setDefaultParams()
      phi0    = 0.16;
 
      dt      = 1e5;
+     T       = 3e5;
      save_dir = ".";
 }
 
@@ -78,6 +79,8 @@ void TwoPhaseFlow::readParams(std::string path)
             iss >> vg_a;
         if(firstword == "dt")
             iss >> dt;
+        if(firstword == "T")
+            iss >> dt;
         if(firstword == "Sl0")
             iss >> Sl0;
         if(firstword == "Pg0")
@@ -89,7 +92,7 @@ void TwoPhaseFlow::readParams(std::string path)
         if(firstword == "problem_name")
             iss >> problem_name;
     }
-    std::cout << "Problem name is " << problem_name << std::endl;
+    //std::cout << "Problem name is " << problem_name << std::endl;
     times[T_IO] += Timer() - t;
 }
 
@@ -383,12 +386,22 @@ void TwoPhaseFlow::setInitialConditions()
     times[T_INIT] += Timer() - t;
 }
 
+void TwoPhaseFlow::makeTimeStep()
+{
+
+}
+
 void TwoPhaseFlow::runSimulation()
 {
     setInitialConditions();
     double t = Timer();
     mesh->Save(save_dir + "/sol0.vtk");
     times[T_IO] += Timer() - t;
+
+    int nt = static_cast<int>(T/dt);
+    for(int it = 1; it <= nt; it++){
+        std::cout << "===== TIME STEP " << it << ", T = " << it*dt << " =====" << std::endl;
+    }
 }
 
 int main(int argc, char *argv[])

@@ -44,7 +44,7 @@ private:
     double Pg0;    // Initial gas pressure
     double phi0;   // Initial porosity
 
-    double dt;
+    double dt, T;
     std::string save_dir;
     std::string problem_name; // can be "2phase_center" for a p. with centr. sat. zone
 
