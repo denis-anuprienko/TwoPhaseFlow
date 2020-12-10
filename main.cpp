@@ -100,7 +100,9 @@ void TwoPhaseFlow::readParams(std::string path)
         if(firstword == "Pg0")
             iss >> Pg0;
         if(firstword == "phi0")
-            iss >> K0;
+            iss >> phi0;
+        if(firstword == "Pt")
+            iss >> Pt;
         if(firstword == "save_dir")
             iss >> save_dir;
         if(firstword == "problem_name")
@@ -687,6 +689,7 @@ int main(int argc, char *argv[])
     Problem.cleanMesh();
     Problem.initTags();
     Problem.computeTPFAcoeff();
+
     Problem.runSimulation();
 
     Mesh::Finalize();
