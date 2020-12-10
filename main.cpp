@@ -387,10 +387,11 @@ void TwoPhaseFlow::assembleResidual()
                     double PlBC = face.RealArray(BCval)[BCAT_L];
 
                     variable Krl = SP*SP;
+                    variable Ke = exp(-gamma*(Pt - PfP - 0.1e6));
 
                     double coef = face.Real(TCoeff);
 
-                    ql = -rhol*Krl*K0/mul * coef * (PlP - PlBC);
+                    ql = -rhol*Krl*K0*Ke/mul * coef * (PlP - PlBC);
                 }
                 R[varX.Index(cellP)] -= ql / V;
             }
@@ -407,7 +408,7 @@ void TwoPhaseFlow::assembleResidual()
                 double coef = face.Real(TCoeff);
 
 
-                variable PlN, SN, Krl, Krg, ql, qg;
+                variable PlN, PfN, SN, Krl, Krg, Ke, ql, qg;
 
                 // Liquid pressure for cell N
                 if(cellN.Integer(PV) == PV_PRES){
@@ -419,7 +420,10 @@ void TwoPhaseFlow::assembleResidual()
                     SN = varX(cellN);
                     PlN = varPg(cellN) - get_Pc(SN);
                 }
+                PfN = SN*PlN + (1.-SN)*varPg(cellN);
 
+                Ke = 0.5*(exp(-gamma*(Pt - PfP - 0.1e6))
+                        + exp(-gamma*(Pt - PfN - 0.1e6)));
 
                 Krl = 0.5 * (SP*SP + SN*SN);
                 Krg = 0.5 * ((1.-SP)*(1.-SP) + (1.-SN)*(1.-SN));
@@ -427,8 +431,8 @@ void TwoPhaseFlow::assembleResidual()
                 if(Krg.GetValue() < 1e-9)
                     Krg = 1e-9;
 
-                ql = -rhol*Krl*K0/mul * coef * (PlP - PlN);
-                qg = -rhog*Krg*K0/mug * coef * (varPg(cellP) - varPg(cellN));
+                ql = -rhol*Krl*K0*Ke/mul * coef * (PlP - PlN);
+                qg = -rhog*Krg*K0*Ke/mug * coef * (varPg(cellP) - varPg(cellN));
 
                 R[varX.Index(cellP)] += ql/V;
                 R[varPg.Index(cellP)] += qg/V;
