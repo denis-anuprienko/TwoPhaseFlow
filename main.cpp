@@ -368,72 +368,71 @@ void TwoPhaseFlow::assembleResidual()
         R[varPhi.Index(cellP)] = (varPhi(cellP) - cellP.Real(Phi_old))/dt - c_phi*(PfP - cellP.Real(Pf_old))/dt;
         //R[varPhi.Index(cellP)] *= V;
 
-        if(cellP->GetStatus() != Element::Ghost){
-            auto faces = cellP->getFaces();
-            // Loop over cell faces
-            for(auto iface = faces.begin(); iface != faces.end(); iface++){
-                Face face = iface->getAsFace();
-                if(face.Boundary()){
+        auto faces = cellP->getFaces();
+        // Loop over cell faces
+        for(auto iface = faces.begin(); iface != faces.end(); iface++){
+            Face face = iface->getAsFace();
+            if(face.Boundary()){
 
-                    // BC for liquid
-                    int faceBCtypeL = face.IntegerArray(BCtype)[BCAT_L];
-                    variable ql;
-                    if(faceBCtypeL == BC_NEUM){
-                        //std::cout << "Face with Neumann BC for liquid" << std::endl;
-                        ql = face.RealArray(BCval)[BCAT_L];
-                    }
-                    else if(faceBCtypeL == BC_DIR){
-                        double PlBC = face.RealArray(BCval)[BCAT_L];
-
-                        variable Krl = SP*SP;
-
-                        double coef = face.Real(TCoeff);
-
-                        variable ql = -rhol*Krl*K0/mul * coef * (PlP - PlBC);
-                    }
-                    R[varX.Index(cellP)] -= ql / V;
+                // BC for liquid
+                int faceBCtypeL = face.IntegerArray(BCtype)[BCAT_L];
+                variable ql;
+                if(faceBCtypeL == BC_NEUM){
+                    //std::cout << "Face with Neumann BC for liquid" << std::endl;
+                    ql = face.RealArray(BCval)[BCAT_L];
                 }
-                else{ // Internal face
-                    Cell cellN;
-                    if(cellP == face->BackCell())
-                        cellN = face->FrontCell();
-                    else{
-                        cellN = face->BackCell();
-                    }
-                    if(cellP == cellN)
-                        exit(1);
+                else if(faceBCtypeL == BC_DIR){
+                    double PlBC = face.RealArray(BCval)[BCAT_L];
+
+                    variable Krl = SP*SP;
 
                     double coef = face.Real(TCoeff);
 
-
-                    variable PlN, SN, Krl, Krg, ql, qg;
-
-                    // Liquid pressure for cell N
-                    if(cellN.Integer(PV) == PV_PRES){
-                        PlN = varX(cellN);
-                        variable Pcc = varPg(cellN) - PlN;
-                        SN = get_Sl(Pcc);
-                    }
-                    else{ // X is Sl
-                        SN = varX(cellN);
-                        PlN = varPg(cellN) - get_Pc(SN);
-                    }
-
-
-                    Krl = 0.5 * (SP*SP + SN*SN);
-                    Krg = 0.5 * ((1.-SP)*(1.-SP) + (1.-SN)*(1.-SN));
-
-                    if(Krg.GetValue() < 1e-9)
-                        Krg = 1e-9;
-
-                    ql = -rhol*Krl*K0/mul * coef * (PlP - PlN);
-                    qg = -rhog*Krg*K0/mug * coef * (varPg(cellP) - varPg(cellN));
-
-                    R[varX.Index(cellP)] += ql/V;
-                    R[varPg.Index(cellP)] += qg/V;
+                    variable ql = -rhol*Krl*K0/mul * coef * (PlP - PlBC);
                 }
+                R[varX.Index(cellP)] -= ql / V;
+            }
+            else{ // Internal face
+                Cell cellN;
+                if(cellP == face->BackCell())
+                    cellN = face->FrontCell();
+                else{
+                    cellN = face->BackCell();
+                }
+                if(cellP == cellN)
+                    exit(1);
+
+                double coef = face.Real(TCoeff);
+
+
+                variable PlN, SN, Krl, Krg, ql, qg;
+
+                // Liquid pressure for cell N
+                if(cellN.Integer(PV) == PV_PRES){
+                    PlN = varX(cellN);
+                    variable Pcc = varPg(cellN) - PlN;
+                    SN = get_Sl(Pcc);
+                }
+                else{ // X is Sl
+                    SN = varX(cellN);
+                    PlN = varPg(cellN) - get_Pc(SN);
+                }
+
+
+                Krl = 0.5 * (SP*SP + SN*SN);
+                Krg = 0.5 * ((1.-SP)*(1.-SP) + (1.-SN)*(1.-SN));
+
+                if(Krg.GetValue() < 1e-9)
+                    Krg = 1e-9;
+
+                ql = -rhol*Krl*K0/mul * coef * (PlP - PlN);
+                qg = -rhog*Krg*K0/mug * coef * (varPg(cellP) - varPg(cellN));
+
+                R[varX.Index(cellP)] += ql/V;
+                R[varPg.Index(cellP)] += qg/V;
             }
         }
+
         //R[varPg.Index(cellP)] = varPg(cellP) - Pg0;
     }
     times[T_ASSEMBLE] += Timer() - t;
