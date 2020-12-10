@@ -2,7 +2,7 @@
 #include "header.h"
 
 TwoPhaseFlow::TwoPhaseFlow()
-    : aut(), times(), iterLinear(0), iterNewton(0)
+    : aut(), times(), iterLinear(0), iterNewton(0), mass(0.0)
 {
     ttt = Timer();
     setDefaultParams();
@@ -122,7 +122,7 @@ void TwoPhaseFlow::readParams(std::string path)
         if(firstword == "save_intensity")
             iss >> saveIntensity;
     }
-    //std::cout << "Problem name is " << problem_name << std::endl;
+    //std::cout << "Pdnstr " << outflowPresL << std::endl;
     times[T_IO] += Timer() - t;
 }
 
@@ -388,7 +388,7 @@ void TwoPhaseFlow::assembleResidual()
 
                     double coef = face.Real(TCoeff);
 
-                    variable ql = -rhol*Krl*K0/mul * coef * (PlP - PlBC);
+                    ql = -rhol*Krl*K0/mul * coef * (PlP - PlBC);
                 }
                 R[varX.Index(cellP)] -= ql / V;
             }
@@ -441,6 +441,7 @@ void TwoPhaseFlow::assembleResidual()
 void TwoPhaseFlow::setInitialConditions()
 {
     double t = Timer();
+    mass = 0.0;
     for(auto icell = mesh->BeginCell(); icell != mesh->EndCell(); icell++){
         if(icell->GetStatus() == Element::Ghost) continue;
 
@@ -458,7 +459,10 @@ void TwoPhaseFlow::setInitialConditions()
         icell->Real(Pl) = icell->Real(Pg) - (get_Pc(S)).GetValue();
         icell->Real(Pf) = S * icell->Real(Pl) + (1.-S) * icell->Real(Pg);
         icell->Real(Phi) = phi0;
+
+        mass += S * icell->Real(Phi) * icell->Volume();
     }
+    mass = rhol * mesh->Integrate(mass);
     times[T_INIT] += Timer() - t;
 }
 
@@ -511,6 +515,20 @@ void TwoPhaseFlow::setPrimaryVariables()
     }
     mesh->ExchangeData(PV, CELL);
     mesh->ExchangeData(X, CELL);
+}
+
+void TwoPhaseFlow::countMass()
+{
+    double mass_new = 0.0;
+    for(auto icell = mesh->BeginCell(); icell != mesh->EndCell(); icell++){
+        if(icell->GetStatus() == Element::Ghost) continue;
+
+        mass_new += icell->Real(Sl) * icell->Real(Phi) * icell->Volume();
+    }
+    mass_new = rhol * mesh->Integrate(mass_new);
+    std::cout << "Mass change is " << mass_new-mass;
+    std::cout << " (" << (mass_new-mass)/mass*1e2 << "%)" << std::endl;
+    mass = mass_new;
 }
 
 void TwoPhaseFlow::makeTimeStep()
@@ -642,6 +660,7 @@ void TwoPhaseFlow::runSimulation()
         std::cout << std::endl;
         std::cout << "===== TIME STEP " << it << ", T = " << it*dt << " =====" << std::endl;
         makeTimeStep();
+        countMass();
         out << mesh->CellByLocalID(0).Real(Pl) << std::endl;
 
         if(it%saveIntensity == 0){

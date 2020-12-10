@@ -109,6 +109,7 @@ private:
     double ttt; // global timer
     int iterLinear;
     int iterNewton;
+    double mass;
 
 public:
     TwoPhaseFlow();
@@ -127,6 +128,7 @@ public:
     void setBoundaryConditions();
     void setPrimaryVariables();
     void initAutodiff();
+    void countMass();
     void makeTimeStep();
     void runSimulation();
 };
