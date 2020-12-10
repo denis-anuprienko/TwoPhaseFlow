@@ -374,9 +374,10 @@ void TwoPhaseFlow::assembleResidual()
 
                     // BC for liquid
                     int faceBCtypeL = face.IntegerArray(BCtype)[BCAT_L];
+                    variable ql;
                     if(faceBCtypeL == BC_NEUM){
                         //std::cout << "Face with Neumann BC for liquid" << std::endl;
-                        R[varX.Index(cellP)] -= face.RealArray(BCval)[BCAT_L];
+                        ql = face.RealArray(BCval)[BCAT_L];
                     }
                     else if(faceBCtypeL == BC_DIR){
                         double PlBC = face.RealArray(BCval)[BCAT_L];
@@ -385,9 +386,9 @@ void TwoPhaseFlow::assembleResidual()
 
                         double coef = face.Real(TCoeff);
 
-                        variable ql = rhol*Krl*K0/mul * coef * (PlP - PlBC);
-                        R[varX.Index(cellP)] += ql/V;
+                        variable ql = -rhol*Krl*K0/mul * coef * (PlP - PlBC);
                     }
+                    R[varX.Index(cellP)] -= ql / V;
                 }
                 else{ // Internal face
                     Cell cellN;
@@ -584,6 +585,8 @@ void TwoPhaseFlow::makeTimeStep()
                     cell.Real(Sl) = get_Sl(cell.Real(Pc)).GetValue();
                 }
                 cell.Real(Phi) -= sol[varPhi.Index(cell)];
+                double S = cell.Real(Sl);
+                cell.Real(Pf) = S*cell.Real(Pl) + (1.-S)*cell.Real(Pg);
             }
             if(gotBad){
                 w *= 0.5;
