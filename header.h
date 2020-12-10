@@ -53,6 +53,7 @@ private:
     double vg_n;   // van Genuchten pore parameter
     double vg_m;
     double Sl0;    // Initial liquid saturation
+    double Sl0_c;  // Initial liquid saturation in center (for 2phase_center)
     double Pg0;    // Initial gas pressure
     double phi0;   // Initial porosity
 

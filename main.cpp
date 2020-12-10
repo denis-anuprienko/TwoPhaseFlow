@@ -47,6 +47,7 @@ void TwoPhaseFlow::setDefaultParams()
      vg_n    = 5;
      vg_m    = 1. - 1./vg_n;
      Sl0     = 0.1;
+     Sl0_c   = 0.9;
      Pg0     = 1e6;
      phi0    = 0.16;
 
@@ -93,6 +94,8 @@ void TwoPhaseFlow::readParams(std::string path)
             iss >> T;
         if(firstword == "Sl0")
             iss >> Sl0;
+        if(firstword == "Sl0_c")
+            iss >> Sl0_c;
         if(firstword == "Pg0")
             iss >> Pg0;
         if(firstword == "phi0")
@@ -438,14 +441,14 @@ void TwoPhaseFlow::setInitialConditions()
         if(icell->GetStatus() == Element::Ghost) continue;
 
         icell->Real(Pg) = Pg0;
-        icell->Real(Sl) = 0.01;
+        icell->Real(Sl) = Sl0;
         if(problem_name == "2phase_center"){
             double x[3];
             icell->Barycenter(x);
             double r = (x[0]-0.006)*(x[0]-0.006) + (x[1]-0.006)*(x[1]-0.006);
             r = sqrt(r);
             if(r < 0.012 / 6.)
-                icell->Real(Sl) = Sl0;
+                icell->Real(Sl) = Sl0_c;
         }
         double S = icell->Real(Sl);
         icell->Real(Pl) = icell->Real(Pg) - (get_Pc(S)).GetValue();
@@ -619,6 +622,8 @@ void TwoPhaseFlow::runSimulation()
     mesh->Save(save_dir + "/sol0.vtk");
     times[T_IO] += Timer() - t;
 
+    std::ofstream out("P.txt");
+
     initAutodiff();
 
     S = new Solver(solver_type);
@@ -630,6 +635,7 @@ void TwoPhaseFlow::runSimulation()
         std::cout << std::endl;
         std::cout << "===== TIME STEP " << it << ", T = " << it*dt << " =====" << std::endl;
         makeTimeStep();
+        out << mesh->CellByLocalID(0).Real(Pl) << std::endl;
 
         t = Timer();
         mesh->Save(save_dir + "/sol" + std::to_string(it) + ".vtk");
