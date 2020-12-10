@@ -61,6 +61,7 @@ void TwoPhaseFlow::setDefaultParams()
      w      = 1.0;
      inflowFluxL = 0.0;
      outflowPresL = 1e6;
+     saveIntensity = 1;
 }
 
 void TwoPhaseFlow::readParams(std::string path)
@@ -118,6 +119,8 @@ void TwoPhaseFlow::readParams(std::string path)
             iss >> inflowFluxL;
         if(firstword == "liquid_outflow_pressure")
             iss >> outflowPresL;
+        if(firstword == "save_intensity")
+            iss >> saveIntensity;
     }
     //std::cout << "Problem name is " << problem_name << std::endl;
     times[T_IO] += Timer() - t;
@@ -431,6 +434,7 @@ void TwoPhaseFlow::assembleResidual()
                 }
             }
         }
+        //R[varPg.Index(cellP)] = varPg(cellP) - Pg0;
     }
     times[T_ASSEMBLE] += Timer() - t;
 }
@@ -548,7 +552,8 @@ void TwoPhaseFlow::makeTimeStep()
         t = Timer();
         bool solved = S->Solve(R.GetResidual(), sol);
         if(!solved){
-            std::cout << "Linear solver failed: " << S->GetReason();
+            std::cout << "Linear solver failed: " << S->GetReason() << std::endl;
+            exit(1);
         }
         iterLinear += S->Iterations();
         times[T_SOLVE] += Timer() - t;
@@ -630,7 +635,7 @@ void TwoPhaseFlow::runSimulation()
     initAutodiff();
 
     S = new Solver(solver_type);
-    S->SetParameter("absolute_tolerance","1e-14");
+    S->SetParameter("absolute_tolerance","1e-15");
     S->SetParameter("relative_tolerance","1e-10");
 
     int nt = static_cast<int>(T/dt);
@@ -640,9 +645,11 @@ void TwoPhaseFlow::runSimulation()
         makeTimeStep();
         out << mesh->CellByLocalID(0).Real(Pl) << std::endl;
 
-        t = Timer();
-        mesh->Save(save_dir + "/sol" + std::to_string(it) + ".vtk");
-        times[T_IO] += Timer() - t;
+        if(it%saveIntensity == 0){
+            t = Timer();
+            mesh->Save(save_dir + "/sol" + std::to_string(it/saveIntensity) + ".vtk");
+            times[T_IO] += Timer() - t;
+        }
     }
 
     delete S;

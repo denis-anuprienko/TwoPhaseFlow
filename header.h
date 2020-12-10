@@ -66,6 +66,7 @@ private:
     double w;                 // relaxation parameter
     double inflowFluxL;       // liquid flux at top boundary
     double outflowPresL;      // liquid pressure at bottom boundary
+    int saveIntensity;
 
     // Mesh
     Mesh mesh_;
