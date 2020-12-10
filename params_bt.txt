@@ -1,0 +1,12 @@
+vg_n 5
+dt 1e5
+T 1e7
+Sl0 0.8
+problem_name shale_test
+maxit 50
+solver_type inner_mptiluc
+rtol 1e-8
+atol 1e-12
+relax_param 0.5
+liquid_inflow_flux 2e-3
+liquid_outflow_pressure 1.1e6
