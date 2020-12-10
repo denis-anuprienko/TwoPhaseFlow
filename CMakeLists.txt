@@ -5,7 +5,8 @@ project(TwoPhaseFlow)
 add_executable(twophase main.cpp)
 
 target_include_directories(twophase PUBLIC ../INMOST/Source/Headers)
-target_link_libraries(twophase ../../INMOST/build/inmost)
+target_link_libraries(twophase optimized ../../INMOST/build/inmost)
+target_link_libraries(twophase debug ../../INMOST/build-debug/inmost)
 
 if(USE_SOLVER)
   if(USE_SOLVER_PETSC)

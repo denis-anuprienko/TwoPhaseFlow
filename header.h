@@ -63,6 +63,8 @@ private:
     double rtol, atol;
     std::string solver_type;
     double w;                 // relaxation parameter
+    double inflowFluxL;       // liquid flux at top boundary
+    double outflowPresL;      // liquid pressure at bottom boundary
 
     // Mesh
     Mesh mesh_;

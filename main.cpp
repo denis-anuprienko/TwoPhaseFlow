@@ -58,6 +58,8 @@ void TwoPhaseFlow::setDefaultParams()
      save_dir = ".";
      solver_type = "inner_ilu2";
      w      = 1.0;
+     inflowFluxL = 0.0;
+     outflowPresL = 1e6;
 }
 
 void TwoPhaseFlow::readParams(std::string path)
@@ -109,6 +111,10 @@ void TwoPhaseFlow::readParams(std::string path)
             iss >> solver_type;
         if(firstword == "relax_param")
             iss >> w;
+        if(firstword == "liquid_inflow_flux")
+            iss >> inflowFluxL;
+        if(firstword == "liquid_outflow_pressure")
+            iss >> outflowPresL;
     }
     //std::cout << "Problem name is " << problem_name << std::endl;
     times[T_IO] += Timer() - t;
@@ -207,28 +213,49 @@ void TwoPhaseFlow::computeTPFAcoeff()
         if(iface->GetStatus() != Element::Ghost){
             Face face = iface->getAsFace();
 
-            if(face.Boundary()) continue;
+            if(face.Boundary()){
+                Cell P = face.BackCell();
 
-            Cell N = face.BackCell();
-            Cell P = face.FrontCell();
+                double xP[3], xN[3];
+                P.Barycenter(xP);
+                face.Barycenter(xN);
 
-            double xP[3], xN[3];
-            P.Barycenter(xP);
-            N.Barycenter(xN);
+                double L[3];
+                double diffXnorm2 = 0;
+                for(unsigned i = 0; i < 3; i++)
+                    diffXnorm2 += (xP[i] - xN[i])*(xP[i] - xN[i]);
+                for(unsigned i = 0; i < 3; i++)
+                    L[i] = (xP[i]-xN[i]) / diffXnorm2;
 
-            double L[3];
-            double diffXnorm2 = 0;
-            for(unsigned i = 0; i < 3; i++)
-                diffXnorm2 += (xP[i] - xN[i])*(xP[i] - xN[i]);
-            for(unsigned i = 0; i < 3; i++)
-                L[i] = (xP[i]-xN[i]) / diffXnorm2;
+                double norF[3];
+                face.UnitNormal(norF);
 
-            double norF[3];
-            face.UnitNormal(norF);
+                double coef = L[0]*norF[0] + L[1]*norF[1] + L[2]*norF[2];
 
-            double coef = L[0]*norF[0] + L[1]*norF[1] + L[2]*norF[2];
+                face.Real(TCoeff) = -coef*face.Area();
+            }
+            else{
+                Cell N = face.BackCell();
+                Cell P = face.FrontCell();
 
-            face.Real(TCoeff) = -coef*face.Area();
+                double xP[3], xN[3];
+                P.Barycenter(xP);
+                N.Barycenter(xN);
+
+                double L[3];
+                double diffXnorm2 = 0;
+                for(unsigned i = 0; i < 3; i++)
+                    diffXnorm2 += (xP[i] - xN[i])*(xP[i] - xN[i]);
+                for(unsigned i = 0; i < 3; i++)
+                    L[i] = (xP[i]-xN[i]) / diffXnorm2;
+
+                double norF[3];
+                face.UnitNormal(norF);
+
+                double coef = L[0]*norF[0] + L[1]*norF[1] + L[2]*norF[2];
+
+                face.Real(TCoeff) = -coef*face.Area();
+            }
         }
     }
     times[T_ASSEMBLE] += Timer() - t;
@@ -303,21 +330,21 @@ void TwoPhaseFlow::assembleResidual()
         Cell cellP = icell->getAsCell();
 
         // Values needed for accumulation part
-        variable SP, Pf, Pl, massL, massG;
+        variable SP, PfP, PlP, massL, massG;
         double SPn, massL_old, massG_old;
         SPn = cellP.Real(Sl_old);
 
         double V = cellP.Volume();
 
         if(cellP.Integer(PV) == PV_PRES){
-            Pl = varX(cellP);
-            variable Pcc = varPg(cellP) - Pl;
+            PlP = varX(cellP);
+            variable Pcc = varPg(cellP) - PlP;
             SP = get_Sl(Pcc);
         }
         else{
             // Saturation formulation, X is Sl
             SP = varX(cellP);
-            Pl = varPg(cellP) - get_Pc(SP);
+            PlP = varPg(cellP) - get_Pc(SP);
         }
 
 
@@ -326,13 +353,13 @@ void TwoPhaseFlow::assembleResidual()
         massL_old     = rhol *     SPn  * cellP.Real(Phi_old);
         massG_old     = rhol * (1.-SPn) * cellP.Real(Phi_old);
 
-        Pf            = SP * Pl + (1.-SP) * varPg(cellP);
+        PfP            = SP * PlP + (1.-SP) * varPg(cellP);
 
         R[varX.Index(cellP)]   = (massL - massL_old)/dt;// * V;
         R[varPg.Index(cellP)]  = (massG - massG_old)/dt;// * V;
         //R[varPg.Index(cellP)]  = varPg(cellP) - 1e6;
 
-        R[varPhi.Index(cellP)] = (varPhi(cellP) - cellP.Real(Phi_old))/dt - c_phi*(Pf - cellP.Real(Pf_old))/dt;
+        R[varPhi.Index(cellP)] = (varPhi(cellP) - cellP.Real(Phi_old))/dt - c_phi*(PfP - cellP.Real(Pf_old))/dt;
         //R[varPhi.Index(cellP)] *= V;
 
         if(cellP->GetStatus() != Element::Ghost){
@@ -342,6 +369,22 @@ void TwoPhaseFlow::assembleResidual()
                 Face face = iface->getAsFace();
                 if(face.Boundary()){
 
+                    // BC for liquid
+                    int faceBCtypeL = face.IntegerArray(BCtype)[BCAT_L];
+                    if(faceBCtypeL == BC_NEUM){
+                        //std::cout << "Face with Neumann BC for liquid" << std::endl;
+                        R[varX.Index(cellP)] -= face.RealArray(BCval)[BCAT_L];
+                    }
+                    else if(faceBCtypeL == BC_DIR){
+                        double PlBC = face.RealArray(BCval)[BCAT_L];
+
+                        variable Krl = SP*SP;
+
+                        double coef = face.Real(TCoeff);
+
+                        variable ql = rhol*Krl*K0/mul * coef * (PlP - PlBC);
+                        R[varX.Index(cellP)] += ql/V;
+                    }
                 }
                 else{ // Internal face
                     Cell cellN;
@@ -356,18 +399,8 @@ void TwoPhaseFlow::assembleResidual()
                     double coef = face.Real(TCoeff);
 
 
-                    variable PlP, PlN, SP, SN, Krl, Krg, ql, qg;
+                    variable PlN, SN, Krl, Krg, ql, qg;
 
-                    // Liquid pressure for cell P
-                    if(cellP.Integer(PV) == PV_PRES){
-                        PlP = varX(cellP);
-                        variable Pcc = varPg(cellP) - PlP;
-                        SP = get_Sl(Pcc);
-                    }
-                    else{ // X is Sl
-                        SP = varX(cellP);
-                        PlP = varPg(cellP) - get_Pc(SP);
-                    }
                     // Liquid pressure for cell N
                     if(cellN.Integer(PV) == PV_PRES){
                         PlN = varX(cellN);
@@ -424,6 +457,9 @@ void TwoPhaseFlow::setInitialConditions()
 
 void TwoPhaseFlow::setBoundaryConditions()
 {
+//    if(problem_name != "shale_test")
+//        return;
+
     double t = Timer();
     for(auto iface = mesh->BeginFace(); iface != mesh->EndFace(); iface++){
         if(iface->GetStatus() == Element::Ghost) continue;
@@ -433,9 +469,19 @@ void TwoPhaseFlow::setBoundaryConditions()
             continue;
         double x[3];
         face.Barycenter(x);
-        if(fabs(x[2]-0.012) < 1e-15){
+
+        // Upper boundary - hardcoded
+        if(fabs(x[2]-0.012) < 1e-7){
+            //std::cout << "Boundary face " << face.GlobalID() << ", z = " << x[2] << std::endl;
             face.IntegerArray(BCtype)[BCAT_L] = BC_NEUM;
-            face.RealArray(BCval)[BCAT_L] = 1e-3;
+            face.RealArray(BCval)[BCAT_L] = inflowFluxL;
+        }
+
+        // Lower boundary - hardcoded
+        if(fabs(x[2]-0.0) < 1e-7){
+            //std::cout << "Boundary face " << face.GlobalID() << ", z = " << x[2] << std::endl;
+            face.IntegerArray(BCtype)[BCAT_L] = BC_DIR;
+            face.RealArray(BCval)[BCAT_L] = outflowPresL;
         }
     }
     times[T_INIT] += Timer() - t;
@@ -504,23 +550,53 @@ void TwoPhaseFlow::makeTimeStep()
         times[T_SOLVE] += Timer() - t;
 
         t = Timer();
-        for(auto icell = mesh->BeginCell(); icell != mesh->EndCell(); icell++){
-            if(icell->GetStatus() == Element::Ghost) continue;
+        // Line search loop
+        copyTagReal(Sltmp, Sl, CELL);
+        copyTagReal(Pgtmp, Pg, CELL);
+        copyTagReal(Phitmp, Phi, CELL);
+        bool lsSuccess = false;
+        w = 1.0;
+        for(int ils = 0; ils < 7; ils++){
+            bool gotBad = false;
+            for(auto icell = mesh->BeginCell(); icell != mesh->EndCell(); icell++){
+                if(icell->GetStatus() == Element::Ghost) continue;
 
-            Cell cell = icell->getAsCell();
-            cell.Real(Pg) -= w*sol[varPg.Index(cell)];
-            if(cell.Integer(PV) == PV_SAT){
-                double Snew = cell.Real(Sl) - w*sol[varX.Index(cell)];
-                cell.Real(Pc) = get_Pc(Snew).GetValue();
-                cell.Real(Pl) = cell.Real(Pg) - cell.Real(Pc);
-                cell.Real(Sl) = Snew;
+                Cell cell = icell->getAsCell();
+                cell.Real(Pg) -= w*sol[varPg.Index(cell)];
+                if(cell.Integer(PV) == PV_SAT){
+                    double Snew = cell.Real(Sl) - w*sol[varX.Index(cell)];
+                    if(Snew > 1.0 || Snew < 0.0){
+                        std::cout << "Bad Sl = " << Snew << " at cell " << cell.GlobalID() << std::endl;
+                        gotBad = true;
+                        break;
+                    }
+
+                    cell.Real(Pc) = get_Pc(Snew).GetValue();
+                    cell.Real(Pl) = cell.Real(Pg) - cell.Real(Pc);
+                    cell.Real(Sl) = Snew;
+                }
+                else{
+                    cell.Real(Pl) -= w*sol[varX.Index(cell)];
+                    cell.Real(Pc) = cell.Real(Pg) - cell.Real(Pl);
+                    cell.Real(Sl) = get_Sl(cell.Real(Pc)).GetValue();
+                }
+                cell.Real(Phi) -= sol[varPhi.Index(cell)];
             }
-            else{
-                cell.Real(Pl) -= w*sol[varX.Index(cell)];
-                cell.Real(Pc) = cell.Real(Pg) - cell.Real(Pl);
-                cell.Real(Sl) = get_Sl(cell.Real(Pc)).GetValue();
+            if(gotBad){
+                w *= 0.5;
+                std::cout << "Decreasing w to " << w << std::endl;
+                copyTagReal(Sl, Sltmp, CELL);
+                copyTagReal(Pg, Pgtmp, CELL);
+                copyTagReal(Phi, Phitmp, CELL);
             }
-            cell.Real(Phi) -= sol[varPhi.Index(cell)];
+            else {
+                lsSuccess = true;
+                break;
+            }
+        }
+        if(!lsSuccess){
+            std::cout << "Line search failed" << std::endl;
+            exit(1);
         }
         times[T_UPDATE] += Timer() - t;
         mesh->ExchangeData(Pl, CELL);
