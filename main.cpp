@@ -93,6 +93,14 @@ void TwoPhaseFlow::readParams(std::string path)
             iss >> dt;
         if(firstword == "T")
             iss >> T;
+        if(firstword == "rhol")
+            iss >> rhol;
+        if(firstword == "rhog")
+            iss >> rhog;
+        if(firstword == "mul")
+            iss >> mul;
+        if(firstword == "mug")
+            iss >> mug;
         if(firstword == "Sl0")
             iss >> Sl0;
         if(firstword == "Sl0_c")
@@ -641,7 +649,7 @@ void TwoPhaseFlow::makeTimeStep()
                 cell.Real(Pf) = S*cell.Real(Pl) + (1.-S)*cell.Real(Pg);
             }
             if(gotBad){
-                w *= 0.5;
+                w *= 0.25;
                 std::cout << "Decreasing w to " << w << std::endl;
                 copyTagReal(Sl, Sltmp, CELL);
                 copyTagReal(Pg, Pgtmp, CELL);
@@ -654,6 +662,7 @@ void TwoPhaseFlow::makeTimeStep()
         }
         if(!lsSuccess){
             std::cout << "Line search failed" << std::endl;
+            mesh->Save("err.vtk");
             exit(1);
         }
         times[T_UPDATE] += Timer() - t;
@@ -665,6 +674,7 @@ void TwoPhaseFlow::makeTimeStep()
     }
     if(!converged){
         std::cout << "Newton failed" << std::endl;
+        mesh->Save("err.vtk");
         exit(1);
     }
 }
