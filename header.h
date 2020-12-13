@@ -122,6 +122,7 @@ public:
     void computeTPFAcoeff();
     variable get_Sl(variable Pcc);
     variable get_Pc(variable S);
+    void get_Kr(variable S, variable &Krl, variable &Krg);
     void assembleResidual();
     void copyTagReal(Tag Dest, Tag Src, ElementType mask);
     void setInitialConditions();

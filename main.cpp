@@ -330,6 +330,13 @@ variable TwoPhaseFlow::get_Pc(variable S)
     return rhol*9.81/vg_a * pow(pow(S,-1./vg_m) - 1., 1./vg_n);
 }
 
+void TwoPhaseFlow::get_Kr(variable S, variable &Krl, variable &Krg)
+{
+    Krl = pow(S, 2.0);
+    Krg = pow(1.-S, 2.0);
+    //Krg = pow(1.-S,2.0)*(1.-S*S);
+}
+
 void TwoPhaseFlow::assembleResidual()
 {
     double t = Timer();
@@ -370,6 +377,9 @@ void TwoPhaseFlow::assembleResidual()
         R[varPhi.Index(cellP)] = (varPhi(cellP) - cellP.Real(Phi_old))/dt - c_phi*(PfP - cellP.Real(Pf_old))/dt;
         //R[varPhi.Index(cellP)] *= V;
 
+        variable KrlP, KrgP;
+        get_Kr(SP, KrlP, KrgP);
+
         auto faces = cellP->getFaces();
         // Loop over cell faces
         for(auto iface = faces.begin(); iface != faces.end(); iface++){
@@ -378,22 +388,33 @@ void TwoPhaseFlow::assembleResidual()
 
                 // BC for liquid
                 int faceBCtypeL = face.IntegerArray(BCtype)[BCAT_L];
-                variable ql;
+                variable ql, qg;
                 if(faceBCtypeL == BC_NEUM){
                     //std::cout << "Face with Neumann BC for liquid" << std::endl;
                     ql = face.RealArray(BCval)[BCAT_L];
                 }
                 else if(faceBCtypeL == BC_DIR){
-                    double PlBC = face.RealArray(BCval)[BCAT_L];
+                    // It's actually phase-averaged fluid pressure!
+                    double PBC = face.RealArray(BCval)[BCAT_L];
 
-                    variable Krl = SP*SP;
+                    variable PlBC, PgBC;
+                    // Pf = S*Pl + (1-S)*Pg = Pg + S*(Pl-Pg) = Pg - S*Pc
+                    PgBC = PBC + SP*get_Pc(SP);
+                    PlBC = (PBC - (1.-SP)*PgBC)/SP;
+
+//                    variable Krg = (1.-SP)*(1.-SP);
+//                    variable Krl = SP*SP;
+                    variable Krl, Krg;
+                    get_Kr(SP, Krl, Krg);
                     variable Ke = exp(-gamma*(Pt - PfP - 0.1e6));
 
                     double coef = face.Real(TCoeff);
 
                     ql = -rhol*Krl*K0*Ke/mul * coef * (PlP - PlBC);
+                    qg = -rhog*Krg*K0*Ke/mug * coef * (varPg(cellP) - PgBC);
                 }
                 R[varX.Index(cellP)] -= ql / V;
+                R[varPg.Index(cellP)] -= qg / V;
             }
             else{ // Internal face
                 Cell cellN;
@@ -425,8 +446,11 @@ void TwoPhaseFlow::assembleResidual()
                 Ke = 0.5*(exp(-gamma*(Pt - PfP - 0.1e6))
                         + exp(-gamma*(Pt - PfN - 0.1e6)));
 
-                Krl = 0.5 * (SP*SP + SN*SN);
-                Krg = 0.5 * ((1.-SP)*(1.-SP) + (1.-SN)*(1.-SN));
+                variable KrlN, KrgN;
+                get_Kr(SN, KrlN, KrgN);
+
+                Krl = 0.5 * (KrlP + KrlN);
+                Krg = 0.5 * (KrgP + KrgN);
 
                 if(Krg.GetValue() < 1e-9)
                     Krg = 1e-9;
@@ -660,6 +684,9 @@ void TwoPhaseFlow::runSimulation()
     S = new Solver(solver_type);
     S->SetParameter("absolute_tolerance","1e-15");
     S->SetParameter("relative_tolerance","1e-10");
+    S->SetParameter("maximum_iterations","1000");
+    S->SetParameter("gmres_substeps","5");
+    S->SetParameter("drop_tolerance","0");
 
     int nt = static_cast<int>(T/dt);
     for(int it = 1; it <= nt; it++){
@@ -667,11 +694,11 @@ void TwoPhaseFlow::runSimulation()
         std::cout << "===== TIME STEP " << it << ", T = " << it*dt << " =====" << std::endl;
         makeTimeStep();
         countMass();
-        out << mesh->CellByLocalID(0).Real(Pl) << std::endl;
 
         if(it%saveIntensity == 0){
             t = Timer();
             mesh->Save(save_dir + "/sol" + std::to_string(it/saveIntensity) + ".vtk");
+            out << mesh->CellByLocalID(0).Real(Pl) << std::endl;
             times[T_IO] += Timer() - t;
         }
     }
