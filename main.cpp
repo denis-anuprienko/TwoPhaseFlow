@@ -398,12 +398,13 @@ void TwoPhaseFlow::assembleResidual()
 
                 // BC for liquid
                 int faceBCtypeL = face.IntegerArray(BCtype)[BCAT_L];
-                variable ql, qg;
+                variable ql = 0.0, qg = 0.0;
                 if(faceBCtypeL == BC_NEUM){
                     //std::cout << "Face with Neumann BC for liquid" << std::endl;
                     ql = face.RealArray(BCval)[BCAT_L];
                 }
                 else if(faceBCtypeL == BC_DIR){
+                    //std::cout << "Face with Dirichlet BC for liquid" << std::endl;
                     // It's actually phase-averaged fluid pressure!
                     double PBC = face.RealArray(BCval)[BCAT_L];
 
@@ -508,8 +509,8 @@ void TwoPhaseFlow::setInitialConditions()
 
 void TwoPhaseFlow::setBoundaryConditions()
 {
-//    if(problem_name != "shale_test")
-//        return;
+    if(problem_name != "shale_test")
+        return;
 
     double t = Timer();
     for(auto iface = mesh->BeginFace(); iface != mesh->EndFace(); iface++){
