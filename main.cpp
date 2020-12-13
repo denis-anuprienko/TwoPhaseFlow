@@ -202,6 +202,7 @@ void TwoPhaseFlow::initTags()
     PV       = mesh->CreateTag("Primary_Variable_Type", DATA_INTEGER, CELL, false, 1);
     Sl_old   = mesh->CreateTag("Liquid_Saturation_Old", DATA_REAL,    CELL, false, 1);
     TCoeff   = mesh->CreateTag("TPFA_Coefficient",      DATA_REAL,    FACE, false, 1);
+    Grav     = mesh->CreateTag("Gravity",               DATA_REAL,    FACE, false, 1);
     Sltmp    = mesh->CreateTag("Sl_tmp",                DATA_REAL,    CELL, false, 1);
     Xtmp     = mesh->CreateTag("X_tmp",                 DATA_REAL,    CELL, false, 1);
     Pgtmp    = mesh->CreateTag("Pg_tmp",                DATA_REAL,    CELL, false, 1);
@@ -212,6 +213,7 @@ void TwoPhaseFlow::initTags()
     // Some tags don't need to be printed
     X.SetPrint(false);
     TCoeff.SetPrint(false);
+    Grav.SetPrint(false);
     Sl_old.SetPrint(false);
     Phi_old.SetPrint(false);
     Sltmp.SetPrint(false);

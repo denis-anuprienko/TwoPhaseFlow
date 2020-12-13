@@ -85,6 +85,7 @@ private:
     Tag X;       // Cellwise variable X (either Sl or Pl)
     Tag PV;      // Primary variable type indicator
     Tag TCoeff;  // TPFA coefficient for faces
+    Tag Grav;    // TPFA approximated gravity term
 
     Tag Sltmp;   // Temporary tag for Sl
     Tag Xtmp;    // Temporary tag for Xl
