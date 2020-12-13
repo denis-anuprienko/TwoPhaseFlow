@@ -376,7 +376,7 @@ void TwoPhaseFlow::assembleResidual()
         massL         = rhol *     SP   * varPhi(cellP);
         massG         = rhog * (1.-SP)  * varPhi(cellP);
         massL_old     = rhol *     SPn  * cellP.Real(Phi_old);
-        massG_old     = rhol * (1.-SPn) * cellP.Real(Phi_old);
+        massG_old     = rhog * (1.-SPn) * cellP.Real(Phi_old);
 
         PfP            = SP * PlP + (1.-SP) * varPg(cellP);
 
