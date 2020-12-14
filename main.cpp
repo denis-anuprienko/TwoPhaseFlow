@@ -1,6 +1,8 @@
 #include <cstdio>
 #include "header.h"
 
+#define V_ID(x, y, z) static_cast<unsigned long long>(((x-0)*(Ny+1)*(Nz+1) + (y-0)*(Nz+1) + (z-0)))
+
 TwoPhaseFlow::TwoPhaseFlow()
     : aut(), times(), iterLinear(0), iterNewton(0), mass(0.0)
 {
@@ -64,6 +66,8 @@ void TwoPhaseFlow::setDefaultParams()
      inflowFluxL = 0.0;
      outflowPresL = 1e6;
      saveIntensity = 1;
+     loadMesh = false;
+     Nx = Ny = Nz = 4;
 }
 
 void TwoPhaseFlow::readParams(std::string path)
@@ -133,9 +137,29 @@ void TwoPhaseFlow::readParams(std::string path)
             iss >> outflowPresL;
         if(firstword == "save_intensity")
             iss >> saveIntensity;
+        if(firstword == "load_mesh")
+            iss >> loadMesh;
+        if(firstword == "mesh_name")
+            iss >> meshName;
+        if(firstword == "Nx")
+            iss >> Nx;
+        if(firstword == "Ny")
+            iss >> Ny;
+        if(firstword == "Nz")
+            iss >> Nz;
     }
     //std::cout << "Pdnstr " << outflowPresL << std::endl;
     times[T_IO] += Timer() - t;
+}
+
+void TwoPhaseFlow::setMesh()
+{
+    if(loadMesh){
+        readMesh(meshName);
+        cleanMesh();
+    }
+    else
+        createMesh();
 }
 
 void TwoPhaseFlow::readMesh(std::string path)
@@ -187,6 +211,51 @@ void TwoPhaseFlow::cleanMesh()
     times[T_INIT] += Timer() - t;
 
     //mesh->Save("out.vtk");
+}
+
+void TwoPhaseFlow::createMesh()
+{
+    if(problem_name != "2phase_center"){
+        std::cout << "Trying to create mesh for unknown problem" << std::endl;
+    }
+
+    double L = 0.012;
+    double dx = L/Nx, dy = L/Ny, dz = L/Nz;
+
+    mesh = new Mesh;
+    ElementArray<Node> nodes(mesh);
+    for(int i = 0; i <= Nx; i++){
+        for(int j = 0; j <= Ny; j++){
+            for(int k = 0; k <= Nz; k++){
+                double coords[3] = {i*dx, j*dy, k*dz};
+                nodes.push_back(mesh->CreateNode(coords));
+            }
+        }
+    }
+
+    for(int i = 1; i <= Nx; i++){
+        for(int j = 1; j <= Ny; j++){
+            for(int k = 1; k <= Nz; k++){
+                ElementArray<Node> verts(mesh);
+                verts.push_back(nodes[V_ID(i-1, j-1, k-1)]);
+                verts.push_back(nodes[V_ID(i-0, j-1, k-1)]);
+                verts.push_back(nodes[V_ID(i-1, j-0, k-1)]);
+                verts.push_back(nodes[V_ID(i-0, j-0, k-1)]);
+                verts.push_back(nodes[V_ID(i-1, j-1, k-0)]);
+                verts.push_back(nodes[V_ID(i-0, j-1, k-0)]);
+                verts.push_back(nodes[V_ID(i-1, j-0, k-0)]);
+                verts.push_back(nodes[V_ID(i-0, j-0, k-0)]);
+
+                const INMOST_DATA_INTEGER_TYPE face_nodes[24] = {0,4,6,2, 1,3,7,5, 0,1,5,4, 2,6,7,3, 0,2,3,1, 4,5,7,6};
+                const INMOST_DATA_INTEGER_TYPE num_nodes[6]   = {4,       4,       4,       4,       4,       4};
+
+                mesh->CreateCell(verts,face_nodes,num_nodes,6); // Create the cubic cell in the mesh
+            }
+        }
+    }
+    mesh->ResolveShared();
+
+    std::cout << "Created mesh with " << mesh->NumberOfCells() << " cells" << std::endl;
 }
 
 void TwoPhaseFlow::initTags()
@@ -725,14 +794,14 @@ int main(int argc, char *argv[])
 {
     if(argc != 2){
         std::cout << "Usage: twophase <param_file_path>" << std::endl;
+        exit(1);
     }
     Solver::Initialize(&argc,&argv);
     Mesh::Initialize(&argc,&argv);
 
     TwoPhaseFlow Problem;
     Problem.readParams(argv[1]);
-    Problem.readMesh(argv[2]);
-    Problem.cleanMesh();
+    Problem.setMesh();
     Problem.initTags();
     Problem.computeTPFAcoeff();
 

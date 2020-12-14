@@ -68,6 +68,7 @@ private:
     double outflowPresL;      // liquid pressure at bottom boundary
     int saveIntensity;        // save VTK every ... step
     bool loadMesh;            // if we load a ready mesh
+    std::string meshName;     // mesh file location
     int Nx, Ny, Nz;           // dimensions for Cartesian mesh to generate
 
     // Mesh
@@ -127,6 +128,8 @@ public:
     void get_Kr(variable S, variable &Krl, variable &Krg);
     void assembleResidual();
     void copyTagReal(Tag Dest, Tag Src, ElementType mask);
+    void setMesh();
+    void createMesh();
     void setInitialConditions();
     void setBoundaryConditions();
     void setPrimaryVariables();
