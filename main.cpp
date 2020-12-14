@@ -6,13 +6,15 @@ TwoPhaseFlow::TwoPhaseFlow()
 {
     ttt = Timer();
     setDefaultParams();
-    mesh = &mesh_;
+    mesh = new Mesh;
 }
 
 TwoPhaseFlow::~TwoPhaseFlow()
 {
     if(aut != nullptr)
         delete aut;
+    if(mesh != nullptr)
+        delete mesh;
 
     std::cout << "Newton iterations: " << iterNewton << std::endl;
     std::cout << "Linear iterations: " << iterLinear << std::endl;
@@ -721,8 +723,8 @@ void TwoPhaseFlow::runSimulation()
 
 int main(int argc, char *argv[])
 {
-    if(argc != 3){
-        std::cout << "Usage: twophase <param_file_path> <mesh_file_path>" << std::endl;
+    if(argc != 2){
+        std::cout << "Usage: twophase <param_file_path>" << std::endl;
     }
     Solver::Initialize(&argc,&argv);
     Mesh::Initialize(&argc,&argv);

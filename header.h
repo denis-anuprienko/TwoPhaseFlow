@@ -58,18 +58,19 @@ private:
     double phi0;   // Initial porosity
 
     double dt, T;
-    std::string save_dir;
+    std::string save_dir;     // results folder
     std::string problem_name; // can be "2phase_center" for a p. with centr. sat. zone
-    int maxit;
-    double rtol, atol;
-    std::string solver_type;
+    int maxit;                // Newton iteration limit
+    double rtol, atol;        // Newton tolerances
+    std::string solver_type;  // linear solver type
     double w;                 // relaxation parameter
     double inflowFluxL;       // liquid flux at top boundary
     double outflowPresL;      // liquid pressure at bottom boundary
-    int saveIntensity;
+    int saveIntensity;        // save VTK every ... step
+    bool loadMesh;            // if we load a ready mesh
+    int Nx, Ny, Nz;           // dimensions for Cartesian mesh to generate
 
     // Mesh
-    Mesh mesh_;
     Mesh *mesh;
 
     // Tags
