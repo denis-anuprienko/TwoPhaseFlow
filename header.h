@@ -86,6 +86,7 @@ private:
     Tag Phi;     // Porosity
     Tag Phi_old; // Porosity at the previous time step
     Tag X;       // Cellwise variable X (either Sl or Pl)
+    Tag Perm;    // Medium reference instrinsic permeability
     Tag PV;      // Primary variable type indicator
     Tag TCoeff;  // TPFA coefficient for faces
     Tag Grav;    // TPFA approximated gravity term

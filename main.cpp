@@ -268,6 +268,7 @@ void TwoPhaseFlow::initTags()
     Pf       = mesh->CreateTag("Fluid_Pressure",        DATA_REAL,    CELL, false, 1);
     Pf_old   = mesh->CreateTag("Fluid_Pressure_Old",    DATA_REAL,    CELL, false, 1);
     X        = mesh->CreateTag("Primary_Variable",      DATA_REAL,    CELL, false, 1);
+    Perm     = mesh->CreateTag("Permeability",          DATA_REAL,    CELL, false, 1);
     Phi      = mesh->CreateTag("Porosity",              DATA_REAL,    CELL, false, 1);
     Phi_old  = mesh->CreateTag("Porosity_Old",          DATA_REAL,    CELL, false, 1);
     PV       = mesh->CreateTag("Primary_Variable_Type", DATA_INTEGER, CELL, false, 1);
@@ -461,6 +462,8 @@ void TwoPhaseFlow::assembleResidual()
         variable KrlP, KrgP;
         get_Kr(SP, KrlP, KrgP);
 
+        double KP = cellP.Real(Perm);
+
         auto faces = cellP->getFaces();
         // Loop over cell faces
         for(auto iface = faces.begin(); iface != faces.end(); iface++){
@@ -485,7 +488,7 @@ void TwoPhaseFlow::assembleResidual()
 
                     double coef = face.Real(TCoeff);
 
-                    ql = -rhol*Krl*K0*Ke/mul * coef * (PlP - PlBC);
+                    ql = -rhol*Krl*KP*Ke/mul * coef * (PlP - PlBC);
                 }
 
                 // Gas
@@ -525,8 +528,8 @@ void TwoPhaseFlow::assembleResidual()
 
                     double coef = face.Real(TCoeff);
 
-                    ql = -rhol*Krl*K0*Ke/mul * coef * (PlP - PlBC);
-                    qg = -rhog*Krg*K0*Ke/mug * coef * (varPg(cellP) - PgBC);
+                    ql = -rhol*Krl*KP*Ke/mul * coef * (PlP - PlBC);
+                    qg = -rhog*Krg*KP*Ke/mug * coef * (varPg(cellP) - PgBC);
                 }
 
                 R[varX.Index(cellP)] -= ql / V;
@@ -579,8 +582,12 @@ void TwoPhaseFlow::assembleResidual()
                 if(Krg.GetValue() < 1e-9)
                     Krg = 1e-9;
 
-                ql = -rhol*Krl*K0*Ke/mul * coef * (PlP - PlN);
-                qg = -rhog*Krg*K0*Ke/mug * coef * (varPg(cellP) - varPg(cellN));
+                double K, KN = cellN.Real(Perm);
+
+                K = 2.0 * KP*KN / (KP + KN);
+
+                ql = -rhol*Krl*K*Ke/mul * coef * (PlP - PlN);
+                qg = -rhog*Krg*K*Ke/mug * coef * (varPg(cellP) - varPg(cellN));
 
                 R[varX.Index(cellP)] += ql/V;
                 R[varPg.Index(cellP)] += qg/V;
@@ -596,8 +603,11 @@ void TwoPhaseFlow::setInitialConditions()
 {
     double t = Timer();
     mass = 0.0;
+    srand(time(nullptr));
     for(auto icell = mesh->BeginCell(); icell != mesh->EndCell(); icell++){
         if(icell->GetStatus() == Element::Ghost) continue;
+
+        icell->Real(Perm) = K0 * (1. + 5*(double)rand()/RAND_MAX);
 
         icell->Real(Pg) = Pg0;
         icell->Real(Sl) = Sl0;
