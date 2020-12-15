@@ -64,6 +64,7 @@ void TwoPhaseFlow::setDefaultParams()
      solver_type = "inner_ilu2";
      w      = 1.0;
      inflowFluxL = 0.0;
+     injectRadius = 1.0;
      outflowPresF = 1e6;
      saveIntensity = 1;
      loadMesh = false;
@@ -133,6 +134,8 @@ void TwoPhaseFlow::readParams(std::string path)
             iss >> w;
         if(firstword == "liquid_inflow_flux")
             iss >> inflowFluxL;
+        if(firstword == "injection_radius")
+            iss >> injectRadius;
         if(firstword == "fluid_outflow_pressure")
             iss >> outflowPresF;
         if(firstword == "save_intensity")
@@ -607,7 +610,7 @@ void TwoPhaseFlow::setInitialConditions()
     for(auto icell = mesh->BeginCell(); icell != mesh->EndCell(); icell++){
         if(icell->GetStatus() == Element::Ghost) continue;
 
-        icell->Real(Perm) = K0 * (1. + 5*(double)rand()/RAND_MAX);
+        icell->Real(Perm) = K0 * (1. + (double)rand()/RAND_MAX);
 
         icell->Real(Pg) = Pg0;
         icell->Real(Sl) = Sl0;
@@ -636,6 +639,8 @@ void TwoPhaseFlow::setBoundaryConditions()
         return;
 
     double t = Timer();
+    ElementArray<Face> inflowFaces;
+    double inflowArea = 0.0;
     for(auto iface = mesh->BeginFace(); iface != mesh->EndFace(); iface++){
         if(iface->GetStatus() == Element::Ghost) continue;
 
@@ -647,18 +652,28 @@ void TwoPhaseFlow::setBoundaryConditions()
 
         // Upper boundary - hardcoded
         if(fabs(x[2]-0.012) < 1e-7){
-            std::cout << "Top boundary face " << face.GlobalID() << ", z = " << x[2] << std::endl;
-            face.IntegerArray(BCtype)[BCAT_L] = BC_NEUM;
-            face.RealArray(BCval)[BCAT_L] = inflowFluxL;
-            inflowCells.push_back(face.BackCell());
+            double r = (x[0]-0.006)*(x[0]-0.006) + (x[1]-0.006)*(x[1]-0.006);
+            r = sqrt(r);
+            if(r <= injectRadius){
+                inflowArea += face.Area();
+                inflowFaces.push_back(face);
+                inflowCells.push_back(face.BackCell());
+            }
         }
 
         // Lower boundary - hardcoded
         if(fabs(x[2]-0.0) < 1e-7){
-            std::cout << "Bottom boundary face " << face.GlobalID() << ", z = " << x[2] << std::endl;
+            //std::cout << "Bottom boundary face " << face.GlobalID() << ", z = " << x[2] << std::endl;
             face.IntegerArray(BCtype)[BCAT_F] = BC_DIR;
             face.RealArray(BCval)[BCAT_F] = outflowPresF;
         }
+    }
+
+    for(auto iface = inflowFaces.begin(); iface != inflowFaces.end(); iface++){
+        Face face = iface->getAsFace();
+        //std::cout << "Top boundary face " << face.GlobalID() << ", z = " << x[2] << std::endl;
+        face.IntegerArray(BCtype)[BCAT_L] = BC_NEUM;
+        face.RealArray(BCval)[BCAT_L] = inflowFluxL/inflowArea;
     }
     times[T_INIT] += Timer() - t;
 }
@@ -822,8 +837,8 @@ void TwoPhaseFlow::runSimulation()
     S->SetParameter("absolute_tolerance","1e-15");
     S->SetParameter("relative_tolerance","1e-10");
     S->SetParameter("maximum_iterations","1000");
-    S->SetParameter("gmres_substeps","5");
-    S->SetParameter("drop_tolerance","0");
+    S->SetParameter("gmres_substeps","0");
+    S->SetParameter("drop_tolerance","1e-1");
 
     int nt = static_cast<int>(T/dt);
     for(int it = 1; it <= nt; it++){
