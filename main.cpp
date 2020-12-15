@@ -704,7 +704,7 @@ void TwoPhaseFlow::makeTimeStep()
                 if(cell.Integer(PV) == PV_SAT){
                     double Snew = cell.Real(Sl) - w*sol[varX.Index(cell)];
                     if(Snew > 1.0 || Snew < 0.0){
-                        std::cout << "Bad Sl = " << Snew << " at cell " << cell.GlobalID() << std::endl;
+                        std::cout << "    Bad Sl = " << Snew << " at cell " << cell.GlobalID() << std::endl;
                         gotBad = true;
                         break;
                     }
@@ -724,7 +724,7 @@ void TwoPhaseFlow::makeTimeStep()
             }
             if(gotBad){
                 w *= 0.25;
-                std::cout << "Decreasing w to " << w << std::endl;
+                std::cout << "    Decreasing w to " << w << std::endl;
                 copyTagReal(Sl, Sltmp, CELL);
                 copyTagReal(Pg, Pgtmp, CELL);
                 copyTagReal(Phi, Phitmp, CELL);
