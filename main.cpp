@@ -650,6 +650,7 @@ void TwoPhaseFlow::setBoundaryConditions()
             std::cout << "Top boundary face " << face.GlobalID() << ", z = " << x[2] << std::endl;
             face.IntegerArray(BCtype)[BCAT_L] = BC_NEUM;
             face.RealArray(BCval)[BCAT_L] = inflowFluxL;
+            inflowCells.push_back(face.BackCell());
         }
 
         // Lower boundary - hardcoded
@@ -834,7 +835,10 @@ void TwoPhaseFlow::runSimulation()
         if(it%saveIntensity == 0){
             t = Timer();
             mesh->Save(save_dir + "/sol" + std::to_string(it/saveIntensity) + ".vtk");
-            out << mesh->CellByLocalID(0).Real(Pl) << std::endl;
+            double avPin = 0.0;
+            for(auto icell = inflowCells.begin(); icell != inflowCells.end(); icell++)
+                avPin += icell->Real(Pl);
+            out << avPin/inflowCells.size() << std::endl;
             times[T_IO] += Timer() - t;
         }
     }
