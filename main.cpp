@@ -9,6 +9,11 @@ TwoPhaseFlow::TwoPhaseFlow()
     ttt = Timer();
     setDefaultParams();
     mesh = new Mesh;
+    rank = mesh->GetProcessorRank();
+    if(mesh->GetProcessorsNumber() == 1)
+        outpExt = ".vtk";
+    else
+        outpExt = ".pvtk";
 }
 
 TwoPhaseFlow::~TwoPhaseFlow()
@@ -71,7 +76,6 @@ void TwoPhaseFlow::setDefaultParams()
      saveIntensity = 1;
      loadMesh = false;
      Nx = Ny = Nz = 4;
-     outpExt = ".vtk";
 }
 
 void TwoPhaseFlow::readParams(std::string path)
@@ -161,28 +165,27 @@ void TwoPhaseFlow::readParams(std::string path)
 void TwoPhaseFlow::setMesh()
 {
     if(loadMesh){
-        readMesh(meshName);
-        cleanMesh();
+        if(rank == 0){
+            readMesh(meshName);
+            cleanMesh();
+        }
     }
     else
         createMesh();
-    MPI_Barrier(MPI_COMM_WORLD);
-    rank = mesh->GetProcessorRank();
-    std::cout << "Rank: " << rank << std::endl;
-    if(mesh->GetProcessorsNumber() > 1)
-        outpExt = ".pvtk";
-    mesh->SetCommunicator(INMOST_MPI_COMM_WORLD);
-    mesh->ExchangeGhost(1, FACE);
 
-    Partitioner * p = new Partitioner(mesh);
-    p->SetMethod(Partitioner::INNER_KMEANS,Partitioner::Partition);
-    p->Evaluate();
-    delete p;
+    MPI_Barrier(MPI_COMM_WORLD);
+    Partitioner p(mesh);
+    p.SetMethod(Partitioner::INNER_KMEANS,Partitioner::Partition);
+    p.Evaluate();
     MPI_Barrier(MPI_COMM_WORLD);
 
     mesh->Redistribute();
     mesh->ReorderEmpty(CELL|FACE|EDGE|NODE);
+    mesh->AssignGlobalID(CELL|FACE|EDGE|NODE);
     MPI_Barrier(MPI_COMM_WORLD);
+    mesh->ExchangeGhost(1, FACE);
+
+    std::cout << "Finished partitioning" << std::endl;
 }
 
 void TwoPhaseFlow::readMesh(std::string path)
