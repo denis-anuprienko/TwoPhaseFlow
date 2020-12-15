@@ -168,6 +168,18 @@ void TwoPhaseFlow::setMesh()
     MPI_Barrier(MPI_COMM_WORLD);
     rank = mesh->GetProcessorRank();
     std::cout << "Rank: " << rank << std::endl;
+    mesh->SetCommunicator(INMOST_MPI_COMM_WORLD);
+    mesh->ExchangeGhost(1, FACE);
+
+    Partitioner * p = new Partitioner(mesh);
+    p->SetMethod(Partitioner::INNER_KMEANS,Partitioner::Partition);
+    p->Evaluate();
+    delete p;
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    mesh->Redistribute();
+    mesh->ReorderEmpty(CELL|FACE|EDGE|NODE);
+    MPI_Barrier(MPI_COMM_WORLD);
 }
 
 void TwoPhaseFlow::readMesh(std::string path)
