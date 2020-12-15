@@ -181,7 +181,7 @@ void TwoPhaseFlow::setMesh()
     p.Evaluate();
     MPI_Barrier(MPI_COMM_WORLD);
 
-//    mesh->Redistribute();
+    mesh->Redistribute();
 //    mesh->ReorderEmpty(CELL|FACE|EDGE|NODE);
 //    mesh->AssignGlobalID(CELL|FACE|EDGE|NODE);
 //    MPI_Barrier(MPI_COMM_WORLD);
