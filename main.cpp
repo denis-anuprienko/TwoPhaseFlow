@@ -185,16 +185,7 @@ void TwoPhaseFlow::setMesh()
     MPI_Barrier(MPI_COMM_WORLD);
     mesh->ExchangeGhost(1, FACE);
 
-    std::cout << "Finished partitioning" << std::endl;
-}
-
-void TwoPhaseFlow::readMesh(std::string path)
-{
     double t = Timer();
-    mesh->Load(path);
-    times[T_IO] += Timer()-t;
-
-    t = Timer();
     Mesh::GeomParam param;
     param[ORIENTATION]  = FACE;
     param[MEASURE]      = FACE | CELL;
@@ -203,6 +194,15 @@ void TwoPhaseFlow::readMesh(std::string path)
     mesh->PrepareGeometricData(param);
     mesh->AssignGlobalID(CELL|FACE);
     times[T_INIT] += Timer() - t;
+
+    std::cout << "Finished partitioning" << std::endl;
+}
+
+void TwoPhaseFlow::readMesh(std::string path)
+{
+    double t = Timer();
+    mesh->Load(path);
+    times[T_IO] += Timer()-t;
 }
 
 void TwoPhaseFlow::cleanMesh()
