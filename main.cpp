@@ -495,8 +495,8 @@ void TwoPhaseFlow::assembleResidual()
                     ql = -rhol*Krl*K0*Ke/mul * coef * (PlP - PlBC);
                     qg = -rhog*Krg*K0*Ke/mug * coef * (varPg(cellP) - PgBC);
                 }
-                R[varX.Index(cellP)] -= ql / V;
-                R[varPg.Index(cellP)] -= qg / V;
+                R[varX.Index(cellP)] -= ql * face.Area() / V;
+                R[varPg.Index(cellP)] -= qg * face.Area() / V;
             }
             else{ // Internal face
                 Cell cellN;

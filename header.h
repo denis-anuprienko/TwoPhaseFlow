@@ -64,7 +64,7 @@ private:
     double rtol, atol;        // Newton tolerances
     std::string solver_type;  // linear solver type
     double w;                 // relaxation parameter
-    double inflowFluxL;       // liquid flux at top boundary
+    double inflowFluxL;       // liquid flux at top boundary ! DIVIDED BY INFLOW AREA
     double outflowPresL;      // liquid pressure at bottom boundary
     int saveIntensity;        // save VTK every ... step
     bool loadMesh;            // if we load a ready mesh
