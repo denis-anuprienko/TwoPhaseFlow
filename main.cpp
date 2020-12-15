@@ -181,10 +181,10 @@ void TwoPhaseFlow::setMesh()
     //printf("Proc %d ready to redistr.\n", rank);
     mesh->Redistribute();
     //printf("Proc %d did redistr.\n", rank);
-//    mesh->ReorderEmpty(CELL|FACE|EDGE|NODE);
-//    mesh->AssignGlobalID(CELL|FACE|EDGE|NODE);
+    mesh->ReorderEmpty(CELL|FACE|EDGE|NODE);
+    mesh->AssignGlobalID(CELL|FACE|EDGE|NODE);
 //    MPI_Barrier(MPI_COMM_WORLD);
-//    mesh->ExchangeGhost(1, FACE);
+    mesh->ExchangeGhost(1, NODE);
 
 //    double t = Timer();
 //    Mesh::GeomParam param;
@@ -225,9 +225,9 @@ void TwoPhaseFlow::cleanMesh()
     tagNames.push_back("Water_Saturation");
     tagNames.push_back("Water_Head_Prev");
     tagNames.push_back("Moisture_Content");
-    tagNames.push_back("_BLK_0_Offset");
-    tagNames.push_back("_BLK_1_Offset");
-    tagNames.push_back("_BLK_2_Offset");
+    //tagNames.push_back("_BLK_0_Offset");
+    //tagNames.push_back("_BLK_1_Offset");
+    //tagNames.push_back("_BLK_2_Offset");
     tagNames.push_back("Primary_Variable");
     tagNames.push_back("Primary_Variable_Type");
 
