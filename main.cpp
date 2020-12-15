@@ -18,20 +18,22 @@ TwoPhaseFlow::~TwoPhaseFlow()
 //    if(mesh != nullptr)
 //        delete mesh;
 
-    std::cout << "Newton iterations: " << iterNewton << std::endl;
-    std::cout << "Linear iterations: " << iterLinear << std::endl;
+    if(rank == 0){
+        std::cout << "Newton iterations: " << iterNewton << std::endl;
+        std::cout << "Linear iterations: " << iterLinear << std::endl;
 
-    printf("\n+=========================\n");
-    printf("| T_assemble = %lf\n", times[T_ASSEMBLE]);
-    printf("| T_solve    = %lf\n", times[T_SOLVE]);
-    printf("| T_precond  = %lf\n", times[T_PRECOND]);
-    printf("| T_liniter  = %lf\n", times[T_LINITER]);
-    printf("| T_IO       = %lf\n", times[T_IO]);
-    printf("| T_update   = %lf\n", times[T_UPDATE]);
-    printf("| T_init     = %lf\n", times[T_INIT]);
-    printf("+-------------------------\n");
-    printf("| T_total    = %lf\n", Timer() - ttt);
-    printf("+=========================\n");
+        printf("\n+=========================\n");
+        printf("| T_assemble = %lf\n", times[T_ASSEMBLE]);
+        printf("| T_solve    = %lf\n", times[T_SOLVE]);
+        printf("| T_precond  = %lf\n", times[T_PRECOND]);
+        printf("| T_liniter  = %lf\n", times[T_LINITER]);
+        printf("| T_IO       = %lf\n", times[T_IO]);
+        printf("| T_update   = %lf\n", times[T_UPDATE]);
+        printf("| T_init     = %lf\n", times[T_INIT]);
+        printf("+-------------------------\n");
+        printf("| T_total    = %lf\n", Timer() - ttt);
+        printf("+=========================\n");
+    }
 }
 
 void TwoPhaseFlow::setDefaultParams()
