@@ -1,0 +1,42 @@
+# Mesh parameters
+mesh_name mesh_1d_128.vtk
+load_mesh 0
+Nx 256
+Ny 256
+Nz 1
+
+# Van Genuchten model parameters
+vg_n 2
+vg_a 1e0
+
+# Time step size and total time in sec
+dt 1e3
+T 1e3
+
+# Compressibility
+c_phi 1e-8
+
+# Phase densities
+rhol 700
+rhog 700
+
+# Medium permeability
+K0 4e-16
+
+# Initial conditions
+Pg0 0.1e6
+Sl0 0.001
+Sl0_c 0.9
+
+# Boundary conditions
+liquid_inflow_flux 2.6e-6 g/h
+#liquid_inflow_flux 0.018 g/h/m^2
+fluid_outflow_pressure 8e6
+injection_radius 0.001
+
+problem_name 2phase_center
+maxit 150
+solver_type inner_mptiluc
+rtol 1e-5
+atol 1e-7
+save_intensity 1
