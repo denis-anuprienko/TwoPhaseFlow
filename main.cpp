@@ -647,6 +647,12 @@ void TwoPhaseFlow::setInitialConditions()
         mass += S * icell->Real(Phi) * icell->Volume();
     }
     mass = rhol * mesh->Integrate(mass);
+    mesh->ExchangeData(Perm, CELL);
+    mesh->ExchangeData(Pg, CELL);
+    mesh->ExchangeData(Pl, CELL);
+    mesh->ExchangeData(Pf, CELL);
+    mesh->ExchangeData(Sl, CELL);
+    mesh->ExchangeData(Phi, CELL);
     times[T_INIT] += Timer() - t;
 }
 
