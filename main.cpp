@@ -796,7 +796,7 @@ void TwoPhaseFlow::makeTimeStep()
         bool lsSuccess = false;
         w = 1.0;
         for(int ils = 0; ils < 7; ils++){
-            bool gotBad = false;
+            int gotBad = 0;
             for(auto icell = mesh->BeginCell(); icell != mesh->EndCell(); icell++){
                 if(icell->GetStatus() == Element::Ghost) continue;
 
@@ -806,7 +806,7 @@ void TwoPhaseFlow::makeTimeStep()
                     double Snew = cell.Real(Sl) - w*sol[varX.Index(cell)];
                     if(Snew > 1.0 || Snew < 0.0){
                         std::cout << "    Bad Sl = " << Snew << " at cell " << cell.GlobalID() << std::endl;
-                        gotBad = true;
+                        gotBad = 1;
                         break;
                     }
 
@@ -823,9 +823,11 @@ void TwoPhaseFlow::makeTimeStep()
                 double S = cell.Real(Sl);
                 cell.Real(Pf) = S*cell.Real(Pl) + (1.-S)*cell.Real(Pg);
             }
+            gotBad = mesh->Integrate(gotBad);
             if(gotBad){
                 w *= 0.25;
-                std::cout << "    Decreasing w to " << w << std::endl;
+                if(rank == 0)
+                    std::cout << "    Decreasing w to " << w << std::endl;
                 copyTagReal(Sl, Sltmp, CELL);
                 copyTagReal(Pg, Pgtmp, CELL);
                 copyTagReal(Phi, Phitmp, CELL);
@@ -871,7 +873,7 @@ void TwoPhaseFlow::runSimulation()
     S->SetParameter("relative_tolerance","1e-10");
     S->SetParameter("maximum_iterations","1000");
     S->SetParameter("gmres_substeps","0");
-    S->SetParameter("drop_tolerance","1e-1");
+    S->SetParameter("drop_tolerance","1e-3");
 
     int nt = static_cast<int>(T/dt);
     for(int it = 1; it <= nt; it++){
