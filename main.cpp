@@ -64,7 +64,7 @@ void TwoPhaseFlow::setDefaultParams()
      solver_type = "inner_ilu2";
      w      = 1.0;
      inflowFluxL = 0.0;
-     outflowPresL = 1e6;
+     outflowPresF = 1e6;
      saveIntensity = 1;
      loadMesh = false;
      Nx = Ny = Nz = 4;
@@ -133,8 +133,8 @@ void TwoPhaseFlow::readParams(std::string path)
             iss >> w;
         if(firstword == "liquid_inflow_flux")
             iss >> inflowFluxL;
-        if(firstword == "liquid_outflow_pressure")
-            iss >> outflowPresL;
+        if(firstword == "fluid_outflow_pressure")
+            iss >> outflowPresF;
         if(firstword == "save_intensity")
             iss >> saveIntensity;
         if(firstword == "load_mesh")
@@ -278,8 +278,8 @@ void TwoPhaseFlow::initTags()
     Xtmp     = mesh->CreateTag("X_tmp",                 DATA_REAL,    CELL, false, 1);
     Pgtmp    = mesh->CreateTag("Pg_tmp",                DATA_REAL,    CELL, false, 1);
     Phitmp   = mesh->CreateTag("Phi_tmp",               DATA_REAL,    CELL, false, 1);
-    BCtype   = mesh->CreateTag("BCtype",                DATA_INTEGER, FACE, FACE,  2);
-    BCval    = mesh->CreateTag("BCval",                 DATA_REAL,    FACE, FACE,  2);
+    BCtype   = mesh->CreateTag("BCtype",                DATA_INTEGER, FACE, FACE,  3);
+    BCval    = mesh->CreateTag("BCval",                 DATA_REAL,    FACE, FACE,  3);
 
     // Some tags don't need to be printed
     X.SetPrint(false);
@@ -466,26 +466,59 @@ void TwoPhaseFlow::assembleResidual()
         for(auto iface = faces.begin(); iface != faces.end(); iface++){
             Face face = iface->getAsFace();
             if(face.Boundary()){
-
-                // BC for liquid
                 int faceBCtypeL = face.IntegerArray(BCtype)[BCAT_L];
+                int faceBCtypeG = face.IntegerArray(BCtype)[BCAT_G];
+                int faceBCtypeF = face.IntegerArray(BCtype)[BCAT_F];
                 variable ql = 0.0, qg = 0.0;
+
+                // Liduid
                 if(faceBCtypeL == BC_NEUM){
                     //std::cout << "Face with Neumann BC for liquid" << std::endl;
-                    ql = face.RealArray(BCval)[BCAT_L];
+                    ql = face.Area()*face.RealArray(BCval)[BCAT_L];
                 }
                 else if(faceBCtypeL == BC_DIR){
-                    //std::cout << "Face with Dirichlet BC for liquid" << std::endl;
-                    // It's actually phase-averaged fluid pressure!
-                    double PBC = face.RealArray(BCval)[BCAT_L];
+                    std::cout << "Face with Dirichlet BC for liquid" << std::endl;
+                    double PlBC = face.RealArray(BCval)[BCAT_L];
+                    variable Krl, Krg;
+                    get_Kr(SP, Krl, Krg);
+                    variable Ke = exp(-gamma*(Pt - PfP - 0.1e6));
+
+                    double coef = face.Real(TCoeff);
+
+                    ql = -rhol*Krl*K0*Ke/mul * coef * (PlP - PlBC);
+                }
+
+                // Gas
+//                if(faceBCtypeG == BC_NEUM){
+//                    //std::cout << "Face with Neumann BC for gas" << std::endl;
+//                    qg = face.Area()*face.RealArray(BCval)[BCAT_G];
+//                }
+//                else if(faceBCtypeG == BC_DIR){
+//                    std::cout << "Face with Dirichlet BC for gas" << std::endl;
+//                    double PgBC = face.RealArray(BCval)[BCAT_G];
+//                    variable Krl, Krg;
+//                    get_Kr(SP, Krl, Krg);
+//                    variable Ke = exp(-gamma*(Pt - PfP - 0.1e6));
+
+//                    double coef = face.Real(TCoeff);
+
+//                    qg = -rhog*Krg*K0*Ke/mug * coef * (varPg(cellP) - PgBC);
+//                }
+
+                if(faceBCtypeF == BC_NEUM){
+                    if(fabs(face.RealArray(BCval)[BCAT_F]) > 1e-15){
+                        std::cout << "Face with Neumann BC for fluid" << std::endl;
+                        exit(1);
+                    }
+                }
+                else if(faceBCtypeF == BC_DIR){
+                    //std::cout << "Face with Dirichlet BC for fluid" << std::endl;
+                    double PBC = face.RealArray(BCval)[BCAT_F];
 
                     variable PlBC, PgBC;
                     // Pf = S*Pl + (1-S)*Pg = Pg + S*(Pl-Pg) = Pg - S*Pc
                     PgBC = PBC + SP*get_Pc(SP);
                     PlBC = (PBC - (1.-SP)*PgBC)/SP;
-
-//                    variable Krg = (1.-SP)*(1.-SP);
-//                    variable Krl = SP*SP;
                     variable Krl, Krg;
                     get_Kr(SP, Krl, Krg);
                     variable Ke = exp(-gamma*(Pt - PfP - 0.1e6));
@@ -495,8 +528,9 @@ void TwoPhaseFlow::assembleResidual()
                     ql = -rhol*Krl*K0*Ke/mul * coef * (PlP - PlBC);
                     qg = -rhog*Krg*K0*Ke/mug * coef * (varPg(cellP) - PgBC);
                 }
-                R[varX.Index(cellP)] -= ql * face.Area() / V;
-                R[varPg.Index(cellP)] -= qg * face.Area() / V;
+
+                R[varX.Index(cellP)] -= ql / V;
+                R[varPg.Index(cellP)] -= qg / V;
             }
             else{ // Internal face
                 Cell cellN;
@@ -603,16 +637,16 @@ void TwoPhaseFlow::setBoundaryConditions()
 
         // Upper boundary - hardcoded
         if(fabs(x[2]-0.012) < 1e-7){
-            //std::cout << "Boundary face " << face.GlobalID() << ", z = " << x[2] << std::endl;
+            std::cout << "Top boundary face " << face.GlobalID() << ", z = " << x[2] << std::endl;
             face.IntegerArray(BCtype)[BCAT_L] = BC_NEUM;
             face.RealArray(BCval)[BCAT_L] = inflowFluxL;
         }
 
         // Lower boundary - hardcoded
         if(fabs(x[2]-0.0) < 1e-7){
-            //std::cout << "Boundary face " << face.GlobalID() << ", z = " << x[2] << std::endl;
-            face.IntegerArray(BCtype)[BCAT_L] = BC_DIR;
-            face.RealArray(BCval)[BCAT_L] = outflowPresL;
+            std::cout << "Bottom boundary face " << face.GlobalID() << ", z = " << x[2] << std::endl;
+            face.IntegerArray(BCtype)[BCAT_F] = BC_DIR;
+            face.RealArray(BCval)[BCAT_F] = outflowPresF;
         }
     }
     times[T_INIT] += Timer() - t;

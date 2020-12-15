@@ -23,14 +23,15 @@ enum{
 
 // BC type
 enum{
-    BC_DIR = 1,
-    BC_NEUM
+    BC_NEUM = 0,
+    BC_DIR
 };
 
 // BC category: liquid or gas
 enum{
-    BCAT_L = 1,
-    BCAT_G
+    BCAT_L = 0,
+    BCAT_G,
+    BCAT_F
 };
 
 class TwoPhaseFlow
@@ -65,7 +66,7 @@ private:
     std::string solver_type;  // linear solver type
     double w;                 // relaxation parameter
     double inflowFluxL;       // liquid flux at top boundary ! DIVIDED BY INFLOW AREA
-    double outflowPresL;      // liquid pressure at bottom boundary
+    double outflowPresF;      // fluid pressure at bottom boundary
     int saveIntensity;        // save VTK every ... step
     bool loadMesh;            // if we load a ready mesh
     std::string meshName;     // mesh file location
