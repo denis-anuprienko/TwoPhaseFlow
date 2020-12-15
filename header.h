@@ -118,6 +118,7 @@ private:
     double mass;
     ElementArray<Cell> inflowCells;
     int rank;
+    std::string outpExt;
 
 public:
     TwoPhaseFlow();

@@ -71,6 +71,7 @@ void TwoPhaseFlow::setDefaultParams()
      saveIntensity = 1;
      loadMesh = false;
      Nx = Ny = Nz = 4;
+     outpExt = ".vtk";
 }
 
 void TwoPhaseFlow::readParams(std::string path)
@@ -168,6 +169,8 @@ void TwoPhaseFlow::setMesh()
     MPI_Barrier(MPI_COMM_WORLD);
     rank = mesh->GetProcessorRank();
     std::cout << "Rank: " << rank << std::endl;
+    if(mesh->GetProcessorsNumber() > 1)
+        outpExt = ".pvtk";
     mesh->SetCommunicator(INMOST_MPI_COMM_WORLD);
     mesh->ExchangeGhost(1, FACE);
 
@@ -425,7 +428,7 @@ variable TwoPhaseFlow::get_Sl(variable Pcc)
 variable TwoPhaseFlow::get_Pc(variable S)
 {
     if(S.GetValue() < 0.0 || S.GetValue() > 1.0){
-        mesh->Save("err.vtk");
+        mesh->Save("err" + outpExt);
         std::cout << "Bad saturation " << S.GetValue() << std::endl;
         exit(1);
     }
@@ -746,9 +749,11 @@ void TwoPhaseFlow::makeTimeStep()
 
     Sparse::Vector sol("Newton_sol", aut->GetFirstIndex(), aut->GetLastIndex());
 
-    std::cout << "Newton: maxit = " << maxit;
-    std::cout << ", rtol = " << rtol << ", atol = " << atol << std::endl;
-    std::cout << "Solver: " << solver_type << std::endl;
+    if(rank == 0){
+        std::cout << "Newton: maxit = " << maxit;
+        std::cout << ", rtol = " << rtol << ", atol = " << atol << std::endl;
+        std::cout << "Solver: " << solver_type << std::endl;
+    }
     bool converged = false;
     for(int iter = 0; iter < maxit; iter++){
         setPrimaryVariables();
@@ -757,11 +762,13 @@ void TwoPhaseFlow::makeTimeStep()
         r2 = R.Norm();
         if(iter == 0)
             r2_0 = r2;
-        std::cout << " iter " << iter << ", |r|_2 = " << r2 << std::endl;
+        if(rank == 0)
+            std::cout << " iter " << iter << ", |r|_2 = " << r2 << std::endl;
 
         if(r2 < atol || r2 < rtol*r2_0){
             converged = true;
-            std::cout << "Converged" << std::endl;
+            if(rank == 0)
+                std::cout << "Converged" << std::endl;
             break;
         }
 
@@ -827,7 +834,7 @@ void TwoPhaseFlow::makeTimeStep()
         }
         if(!lsSuccess){
             std::cout << "Line search failed" << std::endl;
-            mesh->Save("err.vtk");
+            mesh->Save("err" + outpExt);
             exit(1);
         }
         times[T_UPDATE] += Timer() - t;
@@ -839,7 +846,7 @@ void TwoPhaseFlow::makeTimeStep()
     }
     if(!converged){
         std::cout << "Newton failed" << std::endl;
-        mesh->Save("err.vtk");
+        mesh->Save("err" + outpExt);
         exit(1);
     }
 }
@@ -849,7 +856,7 @@ void TwoPhaseFlow::runSimulation()
     setInitialConditions();
     setBoundaryConditions();
     double t = Timer();
-    mesh->Save(save_dir + "/sol0.vtk");
+    mesh->Save(save_dir + "/sol0.pvtk");
     times[T_IO] += Timer() - t;
 
     std::ofstream out("P.txt");
@@ -865,14 +872,17 @@ void TwoPhaseFlow::runSimulation()
 
     int nt = static_cast<int>(T/dt);
     for(int it = 1; it <= nt; it++){
-        std::cout << std::endl;
-        std::cout << "===== TIME STEP " << it << ", T = " << it*dt << " =====" << std::endl;
+        if(rank == 0){
+            std::cout << std::endl;
+            std::cout << "===== TIME STEP " << it << ", T = " << it*dt << " =====" << std::endl;
+        }
         makeTimeStep();
         countMass();
 
         if(it%saveIntensity == 0){
             t = Timer();
-            mesh->Save(save_dir + "/sol" + std::to_string(it/saveIntensity) + ".vtk");
+            mesh->Save(save_dir + "/sol" + std::to_string(it/saveIntensity) + outpExt);
+            //mesh->Save("res.vtk");
             double avPin = 0.0;
             for(auto icell = inflowCells.begin(); icell != inflowCells.end(); icell++)
                 avPin += icell->Real(Pl);
@@ -892,6 +902,7 @@ int main(int argc, char *argv[])
     }
     Solver::Initialize(&argc,&argv);
     Mesh::Initialize(&argc,&argv);
+    Partitioner::Initialize(&argc,&argv);
 
     TwoPhaseFlow Problem;
     Problem.readParams(argv[1]);
@@ -903,5 +914,6 @@ int main(int argc, char *argv[])
 
     Solver::Finalize();
     Mesh::Finalize();
+    Partitioner::Finalize();
     return 0;
 }
