@@ -15,8 +15,8 @@ TwoPhaseFlow::~TwoPhaseFlow()
 {
     if(aut != nullptr)
         delete aut;
-    if(mesh != nullptr)
-        delete mesh;
+//    if(mesh != nullptr)
+//        delete mesh;
 
     std::cout << "Newton iterations: " << iterNewton << std::endl;
     std::cout << "Linear iterations: " << iterLinear << std::endl;
@@ -163,6 +163,9 @@ void TwoPhaseFlow::setMesh()
     }
     else
         createMesh();
+    MPI_Barrier(MPI_COMM_WORLD);
+    rank = mesh->GetProcessorRank();
+    std::cout << "Rank: " << rank << std::endl;
 }
 
 void TwoPhaseFlow::readMesh(std::string path)
@@ -878,7 +881,7 @@ int main(int argc, char *argv[])
 
     Problem.runSimulation();
 
-    Mesh::Finalize();
     Solver::Finalize();
+    Mesh::Finalize();
     return 0;
 }

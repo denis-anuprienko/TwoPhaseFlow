@@ -117,6 +117,7 @@ private:
     int iterNewton;
     double mass;
     ElementArray<Cell> inflowCells;
+    int rank;
 
 public:
     TwoPhaseFlow();
