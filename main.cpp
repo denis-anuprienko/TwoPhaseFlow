@@ -531,8 +531,16 @@ void TwoPhaseFlow::assembleResidual()
                 variable KrlN, KrgN;
                 get_Kr(SN, KrlN, KrgN);
 
-                Krl = 0.5 * (KrlP + KrlN);
-                Krg = 0.5 * (KrgP + KrgN);
+                //Krl = 0.5 * (KrlP + KrlN);
+                //Krg = 0.5 * (KrgP + KrgN);
+                if(PlP.GetValue() > PlN.GetValue())
+                    Krl = KrlP;
+                else
+                    Krl = KrlN;
+                if(varPg(cellP).GetValue() > varPg(cellN).GetValue())
+                    Krg = KrgP;
+                else
+                    Krg = KrgN;
 
                 if(Krg.GetValue() < 1e-9)
                     Krg = 1e-9;
