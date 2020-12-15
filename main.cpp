@@ -180,8 +180,10 @@ void TwoPhaseFlow::setMesh()
     p.SetMethod(Partitioner::INNER_KMEANS,Partitioner::Partition);
     p.Evaluate();
     MPI_Barrier(MPI_COMM_WORLD);
-
+    printf("Proc %d ready to redistr.\n", rank);
     mesh->Redistribute();
+    MPI_Barrier(MPI_COMM_WORLD);
+    printf("Proc %d did redistr.\n", rank);
 //    mesh->ReorderEmpty(CELL|FACE|EDGE|NODE);
 //    mesh->AssignGlobalID(CELL|FACE|EDGE|NODE);
 //    MPI_Barrier(MPI_COMM_WORLD);
