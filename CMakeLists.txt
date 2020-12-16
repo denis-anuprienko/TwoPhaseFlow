@@ -11,6 +11,10 @@ if(NOT INMOST_FOUND)
     message("INMOST not found!")
 endif()
 
+#message(${INMOST_LIBRARIES})
+
+#set(INMOST_LIBRARIES C:/Users/Denis/Documents/repos/INMOST/build-debug/inmost.lib)
+
 include_directories(${INMOST_INCLUDE_DIRS})
 target_link_libraries(twophase ${INMOST_LIBRARIES})
 target_link_libraries(gridgen ${INMOST_LIBRARIES})
@@ -23,6 +27,7 @@ if(USE_MPI)
       message("MPI not found!")
   endif()
 
+  message((${MPI_INCLUDE_PATH}))
   include_directories(${MPI_INCLUDE_PATH})
   target_link_libraries(twophase ${MPI_CXX_LIBRARIES})
   target_link_libraries(gridgen ${MPI_CXX_LIBRARIES})

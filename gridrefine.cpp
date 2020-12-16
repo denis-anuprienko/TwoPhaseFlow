@@ -8,24 +8,38 @@ int main(int argc, char *argv[])
     }
     std::cout << "Only cubic-like grids are supported" << std::endl;
 
-    Mesh m, mesh;
-    m.Load(argv[1]);
+    Mesh::Initialize(&argc, &argv);
+    Partitioner::Initialize(&argc, &argv);
 
-    int refLev = atoi(argv[2]);
+    Mesh *mesh = new Mesh("mesh");
 
-    for(int iref = 0; iref < refLev; iref++){
-        std::cout << std::endl << "Refinement level " << iref << std::endl;
+    int rank = mesh->GetProcessorRank();
+    std::cout << "rank = " << rank << std::endl;
+    MPI_Barrier(INMOST_MPI_COMM_WORLD);
 
-        for(auto inode = m.BeginNode(); inode != m.EndNode(); inode++){
-            Storage::real_array crds = inode->Coords();
-            double coords[3] = {crds[0], crds[1], crds[2]};
-            mesh.CreateNode(coords);
-        }
+    if(rank == 0)
+        mesh->Load(argv[1]);
 
-        for(auto icell = m.BeginCell(); icell != m.EndCell(); icell++){
-            //mesh.CreateCell(icell->getFaces(), icell->getNodes());
-            std::cout << "Added cell " << icell->DataLocalID() << std::endl;
-        }
+    Partitioner p(mesh);
+    p.SetMethod(Partitioner::INNER_KMEANS, Partitioner::Partition);
+    p.Evaluate();
+
+    mesh->Redistribute();
+    mesh->ExchangeGhost(1, NODE);
+
+    Tag T = mesh->CreateTag("My", DATA_REAL, CELL, false, 1);
+    T.SetPrint(true);
+    for(auto icell = mesh->BeginCell(); icell != mesh->EndCell(); icell++){
+        if(icell->GetStatus() == Element::Ghost)
+            continue;
+        double x[3];
+        icell->Barycenter(x);
+        icell->Real(T) = x[0]+x[1]+x[2];
     }
-    mesh.Save("new.vtk");
+    mesh->Save("parallel.pvtk");
+
+    delete mesh;
+
+    Mesh::Finalize();
+    Partitioner::Finalize();
 }
