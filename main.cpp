@@ -705,6 +705,8 @@ void TwoPhaseFlow::setBoundaryConditions()
         face.IntegerArray(BCtype)[BCAT_L] = BC_NEUM;
         face.RealArray(BCval)[BCAT_L] = inflowFluxL/inflowArea;
     }
+    mesh->ExchangeData(BCtype, FACE);
+    mesh->ExchangeData(BCval, FACE);
     times[T_INIT] += Timer() - t;
 }
 
@@ -862,7 +864,7 @@ void TwoPhaseFlow::runSimulation()
     setInitialConditions();
     setBoundaryConditions();
     double t = Timer();
-    mesh->Save(save_dir + "/sol0.pvtk");
+    mesh->Save(save_dir + "/sol0" + outpExt);
     times[T_IO] += Timer() - t;
 
     std::ofstream out("P.txt");
