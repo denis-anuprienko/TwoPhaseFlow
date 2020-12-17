@@ -54,8 +54,8 @@ else()
     include_directories(${Trilinos_TPL_INCLUDE_DIRS})
     #link_directories(${Trilinos_LIBRARY_DIRS})
     #link_directories(${Trilinos_TPL_LIBRARY_DIRS})
-    target_link_libraries(${Trilinos_LIBRARIES})
-    target_link_libraries(${Trilinos_TPL_LIBRARIES})
+    target_link_libraries(twophase ${Trilinos_LIBRARIES})
+    target_link_libraries(twophase ${Trilinos_TPL_LIBRARIES})
 
 
     message("Trilinos FOUND")
