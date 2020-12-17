@@ -12,7 +12,7 @@ endif()
 include_directories(${INMOST_INCLUDE_DIRS})
 message(${INMOST_INCLUDE_DIRS})
 message(${INMOST_LIBRARIES})
-target_link_libraries(twophase ${INMOST_LIBRARIES})
+#target_link_libraries(twophase ${INMOST_LIBRARIES})
 target_link_libraries(twophase /data90t/geosci/anuprienko/INMOST/build-trilinos1/libinmost.a)
 
 message("Dealing with MPI")
