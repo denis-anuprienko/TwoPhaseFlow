@@ -13,8 +13,8 @@ include_directories(${INMOST_INCLUDE_DIRS})
 message(${INMOST_INCLUDE_DIRS})
 message(${INMOST_LIBRARIES})
 #target_link_libraries(twophase ${INMOST_LIBRARIES})
-#target_link_libraries(twophase /data90t/geosci/anuprienko/INMOST/build-trilinos1/libinmost.a)
-link_directories(/data90t/geosci/anuprienko/INMOST/build-trilinos1/)
+target_link_libraries(twophase /data90t/geosci/anuprienko/INMOST/build-trilinos1/libinmost.a)
+#link_directories(/data90t/geosci/anuprienko/INMOST/build-trilinos1/)
 
 message("Dealing with MPI")
 find_package(MPI REQUIRED)
@@ -52,8 +52,10 @@ else()
 
     include_directories(${Trilinos_INCLUDE_DIRS})
     include_directories(${Trilinos_TPL_INCLUDE_DIRS})
-    link_directories(${Trilinos_LIBRARY_DIRS})
-    link_directories(${Trilinos_TPL_LIBRARY_DIRS})
+    #link_directories(${Trilinos_LIBRARY_DIRS})
+    #link_directories(${Trilinos_TPL_LIBRARY_DIRS})
+    target_link_libraries(${Trilinos_LIBRARIES})
+    target_link_libraries(${Trilinos_TPL_LIBRARIES})
 
 
     message("Trilinos FOUND")
