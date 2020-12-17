@@ -10,6 +10,8 @@ if(NOT INMOST_FOUND)
 endif()
 
 include_directories(${INMOST_INCLUDE_DIRS})
+message(${INMOST_INCLUDE_DIRS})
+message(${INMOST_LIBRARIES})
 target_link_libraries(twophase ${INMOST_LIBRARIES})
 
 message("Dealing with MPI")
