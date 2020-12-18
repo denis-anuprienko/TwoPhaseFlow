@@ -125,6 +125,8 @@ void TwoPhaseFlow::readParams(std::string path)
             iss >> phi0;
         if(firstword == "Pt")
             iss >> Pt;
+        if(firstword == "gamma")
+            iss >> gamma;
         if(firstword == "save_dir")
             iss >> save_dir;
         if(firstword == "problem_name")
