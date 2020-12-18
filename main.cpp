@@ -697,9 +697,13 @@ void TwoPhaseFlow::setBoundaryConditions()
 
         // Lower boundary - hardcoded
         if(fabs(x[2]-0.0) < 1e-7){
-            //std::cout << "Bottom boundary face " << face.GlobalID() << ", z = " << x[2] << std::endl;
-            face.IntegerArray(BCtype)[BCAT_F] = BC_DIR;
-            face.RealArray(BCval)[BCAT_F] = outflowPresF;
+            double r = (x[0]-0.006)*(x[0]-0.006) + (x[1]-0.006)*(x[1]-0.006);
+            r = sqrt(r);
+            if(r <= injectRadius){
+                //std::cout << "Bottom boundary face " << face.GlobalID() << ", z = " << x[2] << std::endl;
+                face.IntegerArray(BCtype)[BCAT_F] = BC_DIR;
+                face.RealArray(BCval)[BCAT_F] = outflowPresF;
+            }
         }
     }
 
