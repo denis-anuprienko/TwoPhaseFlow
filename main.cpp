@@ -444,6 +444,8 @@ variable TwoPhaseFlow::get_Pc(variable S)
 void TwoPhaseFlow::get_Kr(variable S, variable &Krl, variable &Krg)
 {
     Krl = pow(S, 2.0);
+    //Krl = sqrt(S) * pow(1.-pow(1.-pow(S,1./vg_m),vg_m),2.0);
+
     Krg = pow(1.-S, 2.0);
     //Krg = pow(1.-S,2.0)*(1.-S*S);
 }
