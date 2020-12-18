@@ -657,6 +657,39 @@ void TwoPhaseFlow::setInitialConditions()
 
         mass += S * icell->Real(Phi) * icell->Volume();
     }
+
+    if(problem_name == "spe"){
+        Tag PORO = mesh->GetTag("PORO");
+        Tag KK = mesh->GetTag("Permeability_scalar");
+
+        double x = -200.0, y = 0.0;
+        mass = 0.;
+
+        for(auto icell = mesh->BeginCell(); icell != mesh->EndCell(); icell++){
+            if(icell->GetStatus() == Element::Ghost) continue;
+
+            double c[3];
+            icell->Barycenter(c);
+
+            double r = (c[0]-x)*(c[0]-x) + (c[1]-y)*(c[1]-y);
+            r = sqrt(r);
+
+
+            icell->Real(Pg) = Pg0;
+            if(r < 400.)
+                icell->Real(Sl) = Sl0_c;
+            else {
+                icell->Real(Sl) = Sl0;
+            }
+
+            icell->Real(Perm) = 1e-10*icell->Real(KK);
+            icell->Real(Phi) = icell->Real(PORO);
+            double S = icell->Real(Sl);
+            icell->Real(Pl) = icell->Real(Pg) - (get_Pc(S)).GetValue();
+            mass += S * icell->Real(Phi) * icell->Volume();
+        }
+    }
+
     mass = rhol * mesh->Integrate(mass);
     mesh->ExchangeData(Perm, CELL);
     mesh->ExchangeData(Pg, CELL);
