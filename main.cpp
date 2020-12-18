@@ -660,7 +660,7 @@ void TwoPhaseFlow::setInitialConditions()
 
     if(problem_name == "spe"){
         Tag PORO = mesh->GetTag("PORO");
-        Tag KK = mesh->GetTag("Permeability_scalar");
+        Tag KK = mesh->GetTag("K");
 
         double x = -200.0, y = 0.0;
         mass = 0.;
@@ -682,7 +682,7 @@ void TwoPhaseFlow::setInitialConditions()
                 icell->Real(Sl) = Sl0;
             }
 
-            icell->Real(Perm) = 1e-10*icell->Real(KK);
+            icell->Real(Perm) = icell->RealArray(KK)[0];
             icell->Real(Phi) = icell->Real(PORO);
             double S = icell->Real(Sl);
             icell->Real(Pl) = icell->Real(Pg) - (get_Pc(S)).GetValue();
