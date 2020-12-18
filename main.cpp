@@ -166,14 +166,14 @@ void TwoPhaseFlow::readParams(std::string path)
 
 void TwoPhaseFlow::setMesh()
 {
-    if(loadMesh){
-        if(rank == 0){
+    if(rank == 0){
+        if(loadMesh){
             readMesh(meshName);
             cleanMesh();
         }
+        else
+            createMesh();
     }
-    else
-        createMesh();
 
     std::cout << "ready to partition mesh\n";
 
