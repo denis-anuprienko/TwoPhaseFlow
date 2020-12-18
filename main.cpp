@@ -186,17 +186,17 @@ void TwoPhaseFlow::setMesh()
     mesh->ReorderEmpty(CELL|FACE|EDGE|NODE);
     mesh->AssignGlobalID(CELL|FACE|EDGE|NODE);
 //    MPI_Barrier(MPI_COMM_WORLD);
-    mesh->ExchangeGhost(1, NODE);
+    mesh->ExchangeGhost(2, NODE);
 
-//    double t = Timer();
-//    Mesh::GeomParam param;
-//    param[ORIENTATION]  = FACE;
-//    param[MEASURE]      = FACE | CELL;
-//    param[BARYCENTER]   = FACE | CELL;
-//    param[NORMAL]       = FACE;
-//    mesh->PrepareGeometricData(param);
-//    mesh->AssignGlobalID(CELL|FACE);
-//    times[T_INIT] += Timer() - t;
+    double t = Timer();
+    Mesh::GeomParam param;
+    param[ORIENTATION]  = FACE;
+    param[MEASURE]      = FACE | CELL;
+    param[BARYCENTER]   = FACE | CELL;
+    param[NORMAL]       = FACE;
+    mesh->PrepareGeometricData(param);
+    mesh->AssignGlobalID(CELL|FACE);
+    times[T_INIT] += Timer() - t;
 
     std::cout << "Finished partitioning" << std::endl;
 }
