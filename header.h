@@ -104,7 +104,7 @@ private:
     Automatizator *aut;
     dynamic_variable varX;   // variable X (Sl or Pl)
     dynamic_variable varPg;  // variable Pg
-    dynamic_variable varPhi; // variable Phi
+    //dynamic_variable varPhi; // variable Phi
     Residual R;
 
     // Solver

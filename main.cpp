@@ -409,15 +409,15 @@ void TwoPhaseFlow::initAutodiff()
 
     INMOST_DATA_ENUM_TYPE XTagEntryIndex = 0;
     INMOST_DATA_ENUM_TYPE GasPressureTagEntryIndex = 0;
-    INMOST_DATA_ENUM_TYPE PorosityTagEntryIndex = 0;
+    //INMOST_DATA_ENUM_TYPE PorosityTagEntryIndex = 0;
 
     XTagEntryIndex           = aut->RegisterTag(X, CELL);
     GasPressureTagEntryIndex = aut->RegisterTag(Pg, CELL);
-    PorosityTagEntryIndex    = aut->RegisterTag(Phi, CELL);
+    //PorosityTagEntryIndex    = aut->RegisterTag(Phi, CELL);
 
     varX   = dynamic_variable(*aut, XTagEntryIndex);
     varPg  = dynamic_variable(*aut, GasPressureTagEntryIndex);
-    varPhi = dynamic_variable(*aut, PorosityTagEntryIndex);
+    //varPhi = dynamic_variable(*aut, PorosityTagEntryIndex);
     aut->EnumerateEntries();
 
     R = Residual("2phase_full", aut->GetFirstIndex(), aut->GetLastIndex());
@@ -477,8 +477,8 @@ void TwoPhaseFlow::assembleResidual()
         }
 
 
-        massL         = rhol *     SP   * varPhi(cellP);
-        massG         = rhog * (1.-SP)  * varPhi(cellP);
+        massL         = rhol *     SP   * 0.16;//varPhi(cellP);
+        massG         = rhog * (1.-SP)  * 0.16;//varPhi(cellP);
         massL_old     = rhol *     SPn  * cellP.Real(Phi_old);
         massG_old     = rhog * (1.-SPn) * cellP.Real(Phi_old);
 
@@ -488,7 +488,7 @@ void TwoPhaseFlow::assembleResidual()
         R[varPg.Index(cellP)]  = (massG - massG_old)/dt;// * V;
         //R[varPg.Index(cellP)]  = varPg(cellP) - 1e6;
 
-        R[varPhi.Index(cellP)] = (varPhi(cellP) - cellP.Real(Phi_old))/dt - c_phi*(PfP - cellP.Real(Pf_old))/dt;
+        //R[varPhi.Index(cellP)] = (varPhi(cellP) - cellP.Real(Phi_old))/dt - c_phi*(PfP - cellP.Real(Pf_old))/dt;
         //R[varPhi.Index(cellP)] *= V;
 
         variable KrlP, KrgP;
@@ -597,6 +597,8 @@ void TwoPhaseFlow::assembleResidual()
                 Ke = 0.5*(exp(-gamma*(Pt - PfP - 0.1e6))
                         + exp(-gamma*(Pt - PfN - 0.1e6)));
 
+                Ke = 1.0;
+
                 variable KrlN, KrgN;
                 get_Kr(SN, KrlN, KrgN);
 
@@ -639,7 +641,7 @@ void TwoPhaseFlow::setInitialConditions()
     for(auto icell = mesh->BeginCell(); icell != mesh->EndCell(); icell++){
         if(icell->GetStatus() == Element::Ghost) continue;
 
-        icell->Real(Perm) = K0 * (0.5 + (double)rand()/RAND_MAX);
+        icell->Real(Perm) = K0;// * (0.5 + (double)rand()/RAND_MAX);
 
         icell->Real(Pg) = Pg0;
         icell->Real(Sl) = Sl0;
@@ -824,6 +826,8 @@ void TwoPhaseFlow::makeTimeStep()
         S->SetMatrix(R.GetJacobian());
         times[T_PRECOND] += Timer() - t;
 
+        //std::cout << "System size: " << R.GetResidual().Size() << std::endl;
+
         t = Timer();
         bool solved = S->Solve(R.GetResidual(), sol);
         if(!solved){
@@ -864,9 +868,10 @@ void TwoPhaseFlow::makeTimeStep()
                     cell.Real(Pc) = cell.Real(Pg) - cell.Real(Pl);
                     cell.Real(Sl) = get_Sl(cell.Real(Pc)).GetValue();
                 }
-                cell.Real(Phi) -= sol[varPhi.Index(cell)];
+                //cell.Real(Phi) -= sol[varPhi.Index(cell)];
                 double S = cell.Real(Sl);
                 cell.Real(Pf) = S*cell.Real(Pl) + (1.-S)*cell.Real(Pg);
+                //cell.Real(Phi) = cell.Real(Phi_old) + c_phi*(cell.Real(Pf)-cell.Real(Pf_old));
             }
             gotBad = mesh->Integrate(gotBad);
             if(gotBad){
@@ -914,11 +919,11 @@ void TwoPhaseFlow::runSimulation()
     initAutodiff();
 
     S = new Solver(solver_type);
-    S->SetParameter("absolute_tolerance","1e-15");
-    S->SetParameter("relative_tolerance","1e-10");
-    S->SetParameter("maximum_iterations","1000");
+    S->SetParameter("absolute_tolerance","1e-9");
+    S->SetParameter("relative_tolerance","1e-6");
+    S->SetParameter("maximum_iterations","2000");
     S->SetParameter("gmres_substeps","0");
-    S->SetParameter("drop_tolerance","1e-3");
+    S->SetParameter("drop_tolerance","0e-3");
 
     int nt = static_cast<int>(T/dt);
     for(int it = 1; it <= nt; it++){

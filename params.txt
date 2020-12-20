@@ -1,42 +1,46 @@
 # Mesh parameters
-mesh_name mesh_1d_128.vtk
+mesh_name out.vtk
 load_mesh 0
-Nx 256
-Ny 256
-Nz 1
+Nx 1
+Ny 1
+Nz 32
 
 # Van Genuchten model parameters
-vg_n 2
-vg_a 1e0
+vg_n 5
+vg_a 1e1
 
 # Time step size and total time in sec
-dt 1e3
-T 1e3
+dt 0.5
+T  1000
 
 # Compressibility
-c_phi 1e-8
+c_phi 10e-8
+gamma 0
 
 # Phase densities
 rhol 700
-rhog 700
+rhog 1
+mul 3e-6
+mug 1e-5
 
 # Medium permeability
-K0 4e-16
+K0 1e-18
 
 # Initial conditions
 Pg0 0.1e6
-Sl0 0.001
+Sl0 1e-1
 Sl0_c 0.9
+phi0 0.01
 
 # Boundary conditions
 liquid_inflow_flux 2.6e-6 g/h
 #liquid_inflow_flux 0.018 g/h/m^2
 fluid_outflow_pressure 8e6
-injection_radius 0.001
+injection_radius 1
 
-problem_name 2phase_center
+problem_name shale_test
 maxit 150
 solver_type inner_mptiluc
 rtol 1e-5
 atol 1e-7
-save_intensity 1
+save_intensity 20
