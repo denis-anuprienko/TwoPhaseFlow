@@ -173,6 +173,7 @@ void TwoPhaseFlow::setMesh()
         }
         else
             createMesh();
+        std::cout << "Mesh has " << mesh->NumberOfCells() << " cells" << std::endl;
     }
 
     std::cout << "ready to partition mesh\n";
@@ -186,7 +187,7 @@ void TwoPhaseFlow::setMesh()
     mesh->ReorderEmpty(CELL|FACE|EDGE|NODE);
     mesh->AssignGlobalID(CELL|FACE|EDGE|NODE);
 //    MPI_Barrier(MPI_COMM_WORLD);
-    mesh->ExchangeGhost(2, NODE);
+    mesh->ExchangeGhost(1, NODE);
 
     double t = Timer();
     Mesh::GeomParam param;
@@ -682,7 +683,7 @@ void TwoPhaseFlow::setInitialConditions()
                 icell->Real(Sl) = Sl0;
             }
 
-            icell->Real(Perm) = icell->RealArray(KK)[0];
+            icell->Real(Perm) = 1e-10*icell->RealArray(KK)[0];
             icell->Real(Phi) = icell->Real(PORO);
             double S = icell->Real(Sl);
             icell->Real(Pl) = icell->Real(Pg) - (get_Pc(S)).GetValue();
@@ -932,10 +933,12 @@ void TwoPhaseFlow::runSimulation()
             t = Timer();
             mesh->Save(save_dir + "/sol" + std::to_string(it/saveIntensity) + outpExt);
             //mesh->Save("res.vtk");
-            double avPin = 0.0;
-            for(auto icell = inflowCells.begin(); icell != inflowCells.end(); icell++)
-                avPin += icell->Real(Pl);
-            out << avPin/inflowCells.size() << std::endl;
+            if(inflowCells.size() > 0){
+                double avPin = 0.0;
+                for(auto icell = inflowCells.begin(); icell != inflowCells.end(); icell++)
+                    avPin += icell->Real(Pl);
+                out << avPin/inflowCells.size() << std::endl;
+            }
             times[T_IO] += Timer() - t;
         }
     }
