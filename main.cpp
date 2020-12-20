@@ -459,8 +459,8 @@ void TwoPhaseFlow::assembleResidual()
         Cell cellP = icell->getAsCell();
 
         // Values needed for accumulation part
-        variable SP, PfP, PlP, massL, massG;
-        double SPn, massL_old, massG_old;
+        variable SP, PfP, PlP, massL, massG, PhiP;
+        double SPn, massL_old, massG_old, PhiPn;
         SPn = cellP.Real(Sl_old);
 
         double V = cellP.Volume();
@@ -477,12 +477,14 @@ void TwoPhaseFlow::assembleResidual()
         }
 
 
-        massL         = rhol *     SP   * 0.16;//varPhi(cellP);
-        massG         = rhog * (1.-SP)  * 0.16;//varPhi(cellP);
+        PfP           = SP * PlP + (1.-SP) * varPg(cellP);
+        PhiPn         = cellP.Real(Phi_old);
+        PhiP          = PhiPn + c_phi * (PfP - cellP.Real(Pf_old));
+
+        massL         = rhol *     SP   * PhiP;//varPhi(cellP);
+        massG         = rhog * (1.-SP)  * PhiP;//varPhi(cellP);
         massL_old     = rhol *     SPn  * cellP.Real(Phi_old);
         massG_old     = rhog * (1.-SPn) * cellP.Real(Phi_old);
-
-        PfP            = SP * PlP + (1.-SP) * varPg(cellP);
 
         R[varX.Index(cellP)]   = (massL - massL_old)/dt;// * V;
         R[varPg.Index(cellP)]  = (massG - massG_old)/dt;// * V;
@@ -832,6 +834,7 @@ void TwoPhaseFlow::makeTimeStep()
         bool solved = S->Solve(R.GetResidual(), sol);
         if(!solved){
             std::cout << "Linear solver failed: " << S->GetReason() << std::endl;
+            std::cout << "Residual: " << S->Residual() << std::endl;
             exit(1);
         }
         iterLinear += S->Iterations();
@@ -871,7 +874,7 @@ void TwoPhaseFlow::makeTimeStep()
                 //cell.Real(Phi) -= sol[varPhi.Index(cell)];
                 double S = cell.Real(Sl);
                 cell.Real(Pf) = S*cell.Real(Pl) + (1.-S)*cell.Real(Pg);
-                //cell.Real(Phi) = cell.Real(Phi_old) + c_phi*(cell.Real(Pf)-cell.Real(Pf_old));
+                cell.Real(Phi) = cell.Real(Phi_old) + c_phi*(cell.Real(Pf)-cell.Real(Pf_old));
             }
             gotBad = mesh->Integrate(gotBad);
             if(gotBad){
@@ -919,9 +922,9 @@ void TwoPhaseFlow::runSimulation()
     initAutodiff();
 
     S = new Solver(solver_type);
-    S->SetParameter("absolute_tolerance","1e-9");
+    S->SetParameter("absolute_tolerance","1e-6");
     S->SetParameter("relative_tolerance","1e-6");
-    S->SetParameter("maximum_iterations","2000");
+    S->SetParameter("maximum_iterations","10000");
     S->SetParameter("gmres_substeps","0");
     S->SetParameter("drop_tolerance","0e-3");
 
