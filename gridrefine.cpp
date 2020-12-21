@@ -1648,7 +1648,7 @@ int main(int argc, char *argv[])
     m->Load(argv[1]);
 
     tagNames.push_back("K");
-    tagNames.push_back("Perm");
+    tagNames.push_back("Permeability_scalar");
     tagNames.push_back("PORO");
 
     Refine2(m);
