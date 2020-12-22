@@ -1619,8 +1619,12 @@ void RefineA(Mesh *m)
     std::vector<std::string> tagNames;
     tagNames.push_back("PORO");
     tagNames.push_back("Permeability_scalar");
+    tagNames.push_back("Permeability");
 
     TagInteger indicator = m->CreateTag("INDICATOR",DATA_INTEGER,CELL,NONE,1);
+
+    for(auto icell = m->BeginCell(); icell != m->EndCell(); icell++)
+        icell->Integer(indicator) = 1;
 
     std::vector<Tag> tags;
     for(unsigned i = 0; i < tagNames.size(); i++){
@@ -1838,7 +1842,7 @@ void RefineA(Mesh *m)
         {
             Cell c = m->CellByLocalID(it);
 
-            printf("Processing cell %d\n", it);
+            //printf("Processing cell %d\n", it);
             if( !c.Hidden() && indicator[c] == schedule_counter )
             {
                 Storage::reference_array cell_hanging_nodes = hanging_nodes[c]; //nodes to be connected
@@ -1929,7 +1933,6 @@ void RefineA(Mesh *m)
                     //clean up structure, so that other cells can use it
                     edge_hanging_nodes[kt].DelData(internal_face_edges);
                 }
-                printf("Ready to determin parent\n");
 
                 //split the cell
                 //retrive parent set
@@ -2054,11 +2057,16 @@ int main(int argc, char *argv[])
 
     tagNames.push_back("K");
     tagNames.push_back("Permeability_scalar");
+    tagNames.push_back("Permeability");
     tagNames.push_back("PORO");
 
-    Refine2(m);
+    //Refine2(m);
 
     RefineA(m);
+
+    std::cout << "Generated mesh with " << m->NumberOfCells() << " cells" << std::endl;
+
+    m->Save("seed.vtk");
 
     delete m;
 
