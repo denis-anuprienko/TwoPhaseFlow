@@ -872,6 +872,8 @@ void TwoPhaseFlow::makeTimeStep()
             std::cout << "Residual: " << S->Residual() << std::endl;
             exit(1);
         }
+        if(rank == 0)
+            std::cout << " Lin.it: " << S->Iterations() << std::endl;
         iterLinear += S->Iterations();
         times[T_SOLVE] += Timer() - t;
 
