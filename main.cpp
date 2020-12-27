@@ -76,6 +76,7 @@ void TwoPhaseFlow::setDefaultParams()
      saveIntensity = 1;
      loadMesh = false;
      Nx = Ny = Nz = 4;
+     saveSol = true;
 }
 
 void TwoPhaseFlow::readParams(std::string path)
@@ -159,6 +160,8 @@ void TwoPhaseFlow::readParams(std::string path)
             iss >> Ny;
         if(firstword == "Nz")
             iss >> Nz;
+        if(firstword == "save_solution")
+            iss >> saveSol;
     }
     //std::cout << "Pdnstr " << outflowPresL << std::endl;
     times[T_IO] += Timer() - t;
@@ -942,7 +945,8 @@ void TwoPhaseFlow::runSimulation()
     setInitialConditions();
     setBoundaryConditions();
     double t = Timer();
-    mesh->Save(save_dir + "/sol0" + outpExt);
+    if(saveSol)
+        mesh->Save(save_dir + "/sol0" + outpExt);
     times[T_IO] += Timer() - t;
 
     std::ofstream out("P.txt");
@@ -967,8 +971,9 @@ void TwoPhaseFlow::runSimulation()
 
         if(it%saveIntensity == 0){
             t = Timer();
-            mesh->Save(save_dir + "/sol" + std::to_string(it/saveIntensity) + outpExt);
-            //mesh->Save("res.vtk");
+            if(saveSol)
+                mesh->Save(save_dir + "/sol" + std::to_string(it/saveIntensity) + outpExt);
+
             if(inflowCells.size() > 0){
                 double avPin = 0.0;
                 for(auto icell = inflowCells.begin(); icell != inflowCells.end(); icell++)

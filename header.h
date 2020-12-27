@@ -72,6 +72,7 @@ private:
     bool loadMesh;            // if we load a ready mesh
     std::string meshName;     // mesh file location
     int Nx, Ny, Nz;           // dimensions for Cartesian mesh to generate
+    bool saveSol;             // if we save solution as (P)VTK
 
     // Mesh
     Mesh *mesh;
