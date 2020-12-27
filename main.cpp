@@ -36,6 +36,7 @@ TwoPhaseFlow::~TwoPhaseFlow()
         printf("| T_IO       = %lf\n", times[T_IO]);
         printf("| T_update   = %lf\n", times[T_UPDATE]);
         printf("| T_init     = %lf\n", times[T_INIT]);
+        printf("| T_mesh     = %lf\n", times[T_MESHGEN]);
         printf("+-------------------------\n");
         printf("| T_total    = %lf\n", Timer() - ttt);
         printf("+=========================\n");
@@ -170,22 +171,29 @@ void TwoPhaseFlow::readParams(std::string path)
 
 void TwoPhaseFlow::setMesh()
 {
-    if(rank == 0){
-        if(loadMesh){
+    if(loadMesh){
+        if(rank == 0){
             readMesh(meshName);
             cleanMesh();
         }
-        else
-            createMesh();
-        std::cout << "Mesh has " << mesh->NumberOfCells() << " cells" << std::endl;
-        std::cout << "Mesh has " << mesh->NumberOfFaces() << " faces" << std::endl;
-        std::cout << "Mesh has " << mesh->NumberOfNodes() << " nodes" << std::endl;
     }
+    else
+        createMesh(); // always in parallel mode!
+
+    int nc = mesh->Integrate(mesh->NumberOfCells());
+    int nf = mesh->Integrate(mesh->NumberOfFaces());
+    int nn = mesh->Integrate(mesh->NumberOfNodes());
+    if(rank == 0){
+        std::cout << "Mesh has " << nc << " cells" << std::endl;
+        std::cout << "Mesh has " << nf << " faces" << std::endl;
+        std::cout << "Mesh has " << nn << " nodes" << std::endl;
+    }
+
 
     //std::cout << "ready to partition mesh\n";
 
     Partitioner p(mesh);
-    p.SetMethod(Partitioner::INNER_RCM,Partitioner::Partition);
+    p.SetMethod(Partitioner::INNER_KMEANS,Partitioner::Partition);
     p.Evaluate();
     //printf("Proc %d ready to redistr.\n", rank);
     mesh->Redistribute();
@@ -253,6 +261,7 @@ void TwoPhaseFlow::cleanMesh()
 
 void TwoPhaseFlow::createMesh()
 {
+    double t = Timer();
     if(problem_name != "2phase_center"){
         std::cout << "Trying to create mesh for unknown problem" << std::endl;
     }
@@ -345,7 +354,8 @@ void TwoPhaseFlow::createMesh()
     }
     //mesh->ResolveShared();
 
-    std::cout << "Created mesh with " << mesh->NumberOfCells() << " cells" << std::endl;
+    //std::cout << "Created mesh with " << mesh->NumberOfCells() << " cells" << std::endl;
+    times[T_MESHGEN] += Timer() - t;
 }
 
 void TwoPhaseFlow::initTags()

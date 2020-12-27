@@ -12,7 +12,8 @@ enum{
     T_LINITER,
     T_IO,
     T_INIT,
-    T_UPDATE
+    T_UPDATE,
+    T_MESHGEN
 };
 
 // Primary variable types
@@ -112,7 +113,7 @@ private:
     Solver *S;
 
     // Auxiliary
-    double times[7];
+    double times[8];
     double ttt; // global timer
     int iterLinear;
     int iterNewton;
