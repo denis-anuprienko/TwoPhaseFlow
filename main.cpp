@@ -662,6 +662,7 @@ void TwoPhaseFlow::setInitialConditions()
     for(auto icell = mesh->BeginCell(); icell != mesh->EndCell(); icell++){
         if(icell->GetStatus() == Element::Ghost) continue;
 
+        icell->Real(Perm) = K0;
 
         icell->Real(Pg) = Pg0;
         icell->Real(Sl) = Sl0;
