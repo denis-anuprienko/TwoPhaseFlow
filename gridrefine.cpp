@@ -2010,7 +2010,10 @@ void RefineA(Mesh *m)
     }
     m->CheckSetLinks(__FILE__,__LINE__);
     //free created tag
-    m->DeleteTag(indicator,FACE|EDGE);
+    m->DeleteTag(indicator);
+    m->DeleteTag(set_id);
+    m->DeleteTag(parent_set);
+    m->DeleteTag(level);
 
 
     m->CheckSetLinks(__FILE__,__LINE__);

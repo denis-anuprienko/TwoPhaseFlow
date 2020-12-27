@@ -174,6 +174,8 @@ void TwoPhaseFlow::setMesh()
         else
             createMesh();
         std::cout << "Mesh has " << mesh->NumberOfCells() << " cells" << std::endl;
+        std::cout << "Mesh has " << mesh->NumberOfFaces() << " faces" << std::endl;
+        std::cout << "Mesh has " << mesh->NumberOfNodes() << " nodes" << std::endl;
     }
 
     std::cout << "ready to partition mesh\n";
@@ -353,6 +355,10 @@ void TwoPhaseFlow::computeTPFAcoeff()
                 double coef = L[0]*norF[0] + L[1]*norF[1] + L[2]*norF[2];
 
                 face.Real(TCoeff) = -coef*face.Area();
+
+                if(std::isinf(coef) || std::isnan(coef)){
+                    printf("Bad coef at face %d\n", face.LocalID());
+                }
             }
             else{
                 Cell N = face.BackCell();
@@ -375,6 +381,9 @@ void TwoPhaseFlow::computeTPFAcoeff()
                 double coef = L[0]*norF[0] + L[1]*norF[1] + L[2]*norF[2];
 
                 face.Real(TCoeff) = -coef*face.Area();
+                if(std::isinf(coef) || std::isnan(coef)){
+                    printf("Bad coef at face %d\n", face.LocalID());
+                }
             }
         }
     }
@@ -444,6 +453,13 @@ variable TwoPhaseFlow::get_Pc(variable S)
 
 void TwoPhaseFlow::get_Kr(variable S, variable &Krl, variable &Krg)
 {
+    double s = S.GetValue();
+
+    if(s > 1.0 || s < 0.0 || std::isinf(s) || std::isnan(s)){
+        std::cout << "Bad s = " << s << std::endl;
+        exit(1);
+    }
+
     Krl = pow(S, 2.0);
     //Krl = sqrt(S) * pow(1.-pow(1.-pow(S,1./vg_m),vg_m),2.0);
 
@@ -599,7 +615,7 @@ void TwoPhaseFlow::assembleResidual()
                 Ke = 0.5*(exp(-gamma*(Pt - PfP - 0.1e6))
                         + exp(-gamma*(Pt - PfN - 0.1e6)));
 
-                Ke = 1.0;
+                //Ke = 1.0;
 
                 variable KrlN, KrgN;
                 get_Kr(SN, KrlN, KrgN);
@@ -643,7 +659,6 @@ void TwoPhaseFlow::setInitialConditions()
     for(auto icell = mesh->BeginCell(); icell != mesh->EndCell(); icell++){
         if(icell->GetStatus() == Element::Ghost) continue;
 
-        icell->Real(Perm) = K0;// * (0.5 + (double)rand()/RAND_MAX);
 
         icell->Real(Pg) = Pg0;
         icell->Real(Sl) = Sl0;
@@ -656,7 +671,8 @@ void TwoPhaseFlow::setInitialConditions()
                 icell->Real(Sl) = Sl0_c;
         }
         double S = icell->Real(Sl);
-        icell->Real(Pl) = icell->Real(Pg) - (get_Pc(S)).GetValue();
+        icell->Real(Pc) = (get_Pc(S)).GetValue();
+        icell->Real(Pl) = icell->Real(Pg) - icell->Real(Pc);
         icell->Real(Pf) = S * icell->Real(Pl) + (1.-S) * icell->Real(Pg);
         icell->Real(Phi) = phi0;
 
@@ -665,7 +681,17 @@ void TwoPhaseFlow::setInitialConditions()
 
     if(problem_name == "spe"){
         Tag PORO = mesh->GetTag("PORO");
-        Tag KK = mesh->GetTag("K");
+        Tag KK;
+//        if(mesh->HaveTag("K"))
+//            KK = mesh->GetTag("K");
+//        if(mesh->HaveTag("Perm"))
+//            KK = mesh->GetTag("K");
+        if(mesh->HaveTag("Permeability_scalar"))
+            KK = mesh->GetTag("Permeability_scalar");
+        else {
+            std::cout << "No 'Permeability_scalar' tag!\n";
+            exit(-1);
+        }
 
         double x = -200.0, y = 0.0;
         mass = 0.;
@@ -691,6 +717,7 @@ void TwoPhaseFlow::setInitialConditions()
             icell->Real(Phi) = icell->Real(PORO);
             double S = icell->Real(Sl);
             icell->Real(Pl) = icell->Real(Pg) - (get_Pc(S)).GetValue();
+            icell->Real(Pc) = icell->Real(Pg) - icell->Real(Pl);
             mass += S * icell->Real(Phi) * icell->Volume();
         }
     }
@@ -898,6 +925,7 @@ void TwoPhaseFlow::makeTimeStep()
         times[T_UPDATE] += Timer() - t;
         mesh->ExchangeData(Pl, CELL);
         mesh->ExchangeData(Pg, CELL);
+        mesh->ExchangeData(Pc, CELL);
         mesh->ExchangeData(Sl, CELL);
         mesh->ExchangeData(Phi, CELL);
         iterNewton++;
@@ -922,11 +950,11 @@ void TwoPhaseFlow::runSimulation()
     initAutodiff();
 
     S = new Solver(solver_type);
-    S->SetParameter("absolute_tolerance","1e-6");
+    S->SetParameter("absolute_tolerance","1e-10");
     S->SetParameter("relative_tolerance","1e-6");
-    S->SetParameter("maximum_iterations","10000");
+    S->SetParameter("maximum_iterations","2000");
     S->SetParameter("gmres_substeps","0");
-    S->SetParameter("drop_tolerance","0e-3");
+    S->SetParameter("drop_tolerance","1e-2");
 
     int nt = static_cast<int>(T/dt);
     for(int it = 1; it <= nt; it++){
