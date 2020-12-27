@@ -181,10 +181,10 @@ void TwoPhaseFlow::setMesh()
         std::cout << "Mesh has " << mesh->NumberOfNodes() << " nodes" << std::endl;
     }
 
-    std::cout << "ready to partition mesh\n";
+    //std::cout << "ready to partition mesh\n";
 
     Partitioner p(mesh);
-    p.SetMethod(Partitioner::INNER_KMEANS,Partitioner::Partition);
+    p.SetMethod(Partitioner::INNER_RCM,Partitioner::Partition);
     p.Evaluate();
     //printf("Proc %d ready to redistr.\n", rank);
     mesh->Redistribute();
@@ -193,6 +193,8 @@ void TwoPhaseFlow::setMesh()
     mesh->AssignGlobalID(CELL|FACE|EDGE|NODE);
 //    MPI_Barrier(MPI_COMM_WORLD);
     mesh->ExchangeGhost(1, NODE);
+
+    std::cout << "Process " << rank << " has " << mesh->NumberOfCells() << " cells" << std::endl;
 
     double t = Timer();
     Mesh::GeomParam param;
