@@ -817,8 +817,10 @@ void TwoPhaseFlow::countMass()
         mass_new += icell->Real(Sl) * icell->Real(Phi) * icell->Volume();
     }
     mass_new = rhol * mesh->Integrate(mass_new);
-    std::cout << "Mass change is " << mass_new-mass;
-    std::cout << " (" << (mass_new-mass)/mass*1e2 << "%)" << std::endl;
+    if(rank == 0){
+        std::cout << "Mass change is " << mass_new-mass;
+        std::cout << " (" << (mass_new-mass)/mass*1e2 << "%)" << std::endl;
+    }
     mass = mass_new;
 }
 
