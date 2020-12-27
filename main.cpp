@@ -1,7 +1,8 @@
 #include <cstdio>
 #include "header.h"
 
-#define V_ID(x, y, z) static_cast<unsigned long long>(((x-0)*(Ny+1)*(Nz+1) + (y-0)*(Nz+1) + (z-0)))
+//#define V_ID(x, y, z) static_cast<unsigned long long>(((x-0)*(Ny+1)*(Nz+1) + (y-0)*(Nz+1) + (z-0)))
+#define V_ID(x, y, z) ((x-localstart[0])*(localsize[1]+1)*(localsize[2]+1) + (y-localstart[1])*(localsize[2]+1) + (z-localstart[2]))
 
 TwoPhaseFlow::TwoPhaseFlow()
     : aut(), times(), iterLinear(0), iterNewton(0), mass(0.0)
@@ -260,19 +261,71 @@ void TwoPhaseFlow::createMesh()
     double dx = L/Nx, dy = L/Ny, dz = L/Nz;
 
     mesh = new Mesh;
+
+    int procs_per_axis[3] = {1,1,1};
+    int sizes[3] = {Nx,Ny,Nz};
+
+    {
+        int divsize = mesh->GetProcessorsNumber();
+        std::vector<int> divs;
+        while( divsize > 1 )
+        {
+            for(int k = 2; k <= divsize; k++)
+                if( divsize % k == 0 )
+                {
+                    divs.push_back(k);
+                    divsize /= k;
+                    break;
+                }
+        }
+        int elements_per_procs[3] = {sizes[0],sizes[1],sizes[2]};
+        for(std::vector<int>::reverse_iterator it = divs.rbegin(); it != divs.rend(); it++)
+        {
+            int * max = std::max_element(elements_per_procs+0,elements_per_procs+3);
+            procs_per_axis[max-elements_per_procs] *= *it;
+            (*max) /= *it;
+        }
+    }
+
+    //rank = proc_coords[2] * procs_per_axis[0] *procs_per_axis[1] + proc_coords[1] * procs_per_axis[0] + proc_coords[0];
+    int proc_coords[3] = {rank % procs_per_axis[0] , rank / procs_per_axis[0] % procs_per_axis[1], rank / (procs_per_axis[0] *procs_per_axis[1]) };
+
+    int localsize[3], localstart[3], localend[3];
+    int avgsize[3] =
+            {
+                    (int)ceil((double)sizes[0]/procs_per_axis[0]),
+                    (int)ceil((double)sizes[1]/procs_per_axis[1]),
+                    (int)ceil((double)sizes[2]/procs_per_axis[2])
+            };
+
+    for(int j = 0; j < 3; j++)
+    {
+        localstart[j] = avgsize[j] * proc_coords[j];
+        if( proc_coords[j] == procs_per_axis[j] - 1 )
+            localsize[j] = sizes[j] - avgsize[j] * (procs_per_axis[j]-1);
+        else localsize[j] = avgsize[j];
+        localend[j] = localstart[j] + localsize[j];
+    }
+
     ElementArray<Node> nodes(mesh);
-    for(int i = 0; i <= Nx; i++){
-        for(int j = 0; j <= Ny; j++){
-            for(int k = 0; k <= Nz; k++){
+//    for(int i = 0; i <= Nx; i++){
+//        for(int j = 0; j <= Ny; j++){
+//            for(int k = 0; k <= Nz; k++){
+    for(int i = localstart[0]; i <= localend[0]; i++){
+        for(int j = localstart[1]; j <= localend[1]; j++){
+            for(int k = localstart[2]; k <= localend[2]; k++){
                 double coords[3] = {i*dx, j*dy, k*dz};
                 nodes.push_back(mesh->CreateNode(coords));
             }
         }
     }
 
-    for(int i = 1; i <= Nx; i++){
-        for(int j = 1; j <= Ny; j++){
-            for(int k = 1; k <= Nz; k++){
+//    for(int i = 1; i <= Nx; i++){
+//        for(int j = 1; j <= Ny; j++){
+//            for(int k = 1; k <= Nz; k++){
+    for(int i = localstart[0]+1; i <= localend[0]; i++){
+        for(int j = localstart[1]+1; j <= localend[1]; j++){
+            for(int k = localstart[2]+1; k <= localend[2]; k++){
                 ElementArray<Node> verts(mesh);
                 verts.push_back(nodes[V_ID(i-1, j-1, k-1)]);
                 verts.push_back(nodes[V_ID(i-0, j-1, k-1)]);
@@ -290,7 +343,7 @@ void TwoPhaseFlow::createMesh()
             }
         }
     }
-    mesh->ResolveShared();
+    //mesh->ResolveShared();
 
     std::cout << "Created mesh with " << mesh->NumberOfCells() << " cells" << std::endl;
 }
