@@ -8,6 +8,7 @@ option(USE_TRILINOS "Use Trilinos solver" OFF)
 add_executable(twophase main.cpp)
 add_executable(gridrefine gridrefine.cpp)
 add_executable(gmshgrid gmshgrid.cpp)
+add_executable(gridgen gridgen.cpp)
 
 find_package(INMOST REQUIRED)
 if(NOT INMOST_FOUND)
