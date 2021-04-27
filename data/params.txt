@@ -1,0 +1,51 @@
+# Mesh parameters
+mesh_name gms1.vtk
+load_mesh 0
+Nx 15
+Ny 15
+Nz 25
+save_dir . test
+save_solution 1
+
+# Van Genuchten model parameters
+vg_n 16
+vg_a 1e-2
+
+# Time step size and total time in sec
+dt 1320
+T  13200
+
+# Compressibility
+c_phi 1.2e-8
+gamma 1e-8
+
+# Phase densities
+rhol 700
+rhog 1
+mul 1e-5
+mug 1e-5
+
+# Medium permeability
+K0 1e-18
+
+# Initial conditions
+Pg0 8686682.83186
+Sl0 1e-2
+Sl0_c 0.8
+phi0 0.16
+
+# Boundary conditions
+liquid_inflow_flux 2.6e-6 kg/s
+#liquid_inflow_flux 0.018 g/h/m^2
+fluid_outflow_pressure 8e6
+injection_radius 0.0005
+
+problem_name shale_test
+maxit 20
+solver_type inner_mptiluc
+rtol 1e-5
+atol 1e-4
+save_intensity 1
+
+# ПФО Лидия Викторовна, она занята грантом
+# Разобраться с бакли-левереттом
