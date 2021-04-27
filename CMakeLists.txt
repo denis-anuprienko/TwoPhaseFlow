@@ -21,6 +21,7 @@ message(${INMOST_LIBRARIES})
 target_link_libraries(twophase ${INMOST_LIBRARIES})
 target_link_libraries(gridrefine ${INMOST_LIBRARIES})
 target_link_libraries(gmshgrid ${INMOST_LIBRARIES})
+target_link_libraries(gridgen ${INMOST_LIBRARIES})
 #target_link_libraries(twophase ../../INMOST/build-debug/inmost)#${INMOST_LIBRARIES})
 #target_link_libraries(gridrefine ../../INMOST/build-debug/inmost)#${INMOST_LIBRARIES})
 
