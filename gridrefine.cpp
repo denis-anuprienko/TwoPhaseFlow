@@ -1620,6 +1620,7 @@ void RefineA(Mesh *m)
     tagNames.push_back("PORO");
     tagNames.push_back("Permeability_scalar");
     tagNames.push_back("Permeability");
+    tagNames.push_back("K");
 
     TagInteger indicator = m->CreateTag("INDICATOR",DATA_INTEGER,CELL,NONE,1);
 
@@ -2068,6 +2069,10 @@ int main(int argc, char *argv[])
     RefineA(m);
 
     std::cout << "Generated mesh with " << m->NumberOfCells() << " cells" << std::endl;
+
+//    if(m->HaveTag("GLOBAL_ID"))
+//        m->DeleteTag(m->GetTag("GLOBAL_ID"));
+//    m->AssignGlobalID(CELL|FACE);
 
     m->Save("seed.vtk");
 

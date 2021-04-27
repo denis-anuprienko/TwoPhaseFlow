@@ -82,7 +82,9 @@ private:
     Tag Sl;      // Liquid saturation
     Tag Sl_old;  // Liquid saturation at the previous time step
     Tag Pl;      // Liquid pressure
+    Tag Pl_old;
     Tag Pg;      // Gas pressure
+    Tag Pg_old;
     Tag Pc;      // Capillary pressure
     Tag Pf;      // Phase-averaged fluid pressure
     Tag Pf_old;  // Phase-averaged fluid pressure at the previous time step
@@ -119,6 +121,7 @@ private:
     int iterNewton;
     double mass;
     ElementArray<Cell> inflowCells;
+    double iclsize;
     int rank;
     std::string outpExt;
 
@@ -143,7 +146,7 @@ public:
     void setPrimaryVariables();
     void initAutodiff();
     void countMass();
-    void makeTimeStep();
+    bool makeTimeStep();
     void runSimulation();
 };
 

@@ -4,6 +4,9 @@
 //#define V_ID(x, y, z) static_cast<unsigned long long>(((x-0)*(Ny+1)*(Nz+1) + (y-0)*(Nz+1) + (z-0)))
 #define V_ID(x, y, z) ((x-localstart[0])*(localsize[1]+1)*(localsize[2]+1) + (y-localstart[1])*(localsize[2]+1) + (z-localstart[2]))
 
+double inflowArea;
+double dtDesir, dtnew;
+
 TwoPhaseFlow::TwoPhaseFlow()
     : aut(), times(), iterLinear(0), iterNewton(0), mass(0.0)
 {
@@ -108,6 +111,7 @@ void TwoPhaseFlow::readParams(std::string path)
             iss >> vg_a;
         if(firstword == "dt")
             iss >> dt;
+        dtDesir = dt;
         if(firstword == "T")
             iss >> T;
         if(firstword == "rhol")
@@ -167,6 +171,8 @@ void TwoPhaseFlow::readParams(std::string path)
     }
     //std::cout << "Pdnstr " << outflowPresL << std::endl;
     times[T_IO] += Timer() - t;
+
+    printf("mu/k/rho RATIO = %e\n", mul/K0/rhol);
 }
 
 void TwoPhaseFlow::setMesh()
@@ -193,7 +199,7 @@ void TwoPhaseFlow::setMesh()
     //std::cout << "ready to partition mesh\n";
 
     Partitioner p(mesh);
-    p.SetMethod(Partitioner::INNER_KMEANS,Partitioner::Partition);
+    p.SetMethod(Partitioner::INNER_KMEANS, Partitioner::Repartition);
     p.Evaluate();
     //printf("Proc %d ready to redistr.\n", rank);
     mesh->Redistribute();
@@ -348,7 +354,19 @@ void TwoPhaseFlow::createMesh()
                 const INMOST_DATA_INTEGER_TYPE face_nodes[24] = {0,4,6,2, 1,3,7,5, 0,1,5,4, 2,6,7,3, 0,2,3,1, 4,5,7,6};
                 const INMOST_DATA_INTEGER_TYPE num_nodes[6]   = {4,       4,       4,       4,       4,       4};
 
-                mesh->CreateCell(verts,face_nodes,num_nodes,6); // Create the cubic cell in the mesh
+                double avX[3] = {0.,0.,0.};
+                for(auto iv = verts.begin(); iv != verts.end(); iv++){
+                    double x[3];
+                    iv->Barycenter(x);
+                    for(int i = 0; i < 3; i++)
+                        avX[i] += x[i]/verts.size();
+                }
+                double r = 0.0;
+                for(int i = 0; i < 2; i++)
+                    r += (avX[i]-0.006)*(avX[i]-0.006);
+                //printf("r = %lf\n", sqrt(r));
+                if(sqrt(r) < 0.006)
+                    mesh->CreateCell(verts,face_nodes,num_nodes,6); // Create the cubic cell in the mesh
             }
         }
     }
@@ -367,6 +385,8 @@ void TwoPhaseFlow::initTags()
     Pg       = mesh->CreateTag("Gas_Pressure",          DATA_REAL,    CELL, false, 1);
     Pf       = mesh->CreateTag("Fluid_Pressure",        DATA_REAL,    CELL, false, 1);
     Pf_old   = mesh->CreateTag("Fluid_Pressure_Old",    DATA_REAL,    CELL, false, 1);
+    Pl_old   = mesh->CreateTag("Liquid_Pressure_Old",   DATA_REAL,    CELL, false, 1);
+    Pg_old   = mesh->CreateTag("Gas_Pressure_Old",      DATA_REAL,    CELL, false, 1);
     X        = mesh->CreateTag("Primary_Variable",      DATA_REAL,    CELL, false, 1);
     Perm     = mesh->CreateTag("Permeability",          DATA_REAL,    CELL, false, 1);
     Phi      = mesh->CreateTag("Porosity",              DATA_REAL,    CELL, false, 1);
@@ -529,6 +549,9 @@ void TwoPhaseFlow::get_Kr(variable S, variable &Krl, variable &Krg)
     }
 
     Krl = pow(S, 2.0);
+    double Krmin = 1e-10;
+    if(Krl.GetValue() < Krmin)
+        Krl = Krmin;
     //Krl = sqrt(S) * pow(1.-pow(1.-pow(S,1./vg_m),vg_m),2.0);
 
     Krg = pow(1.-S, 2.0);
@@ -563,7 +586,8 @@ void TwoPhaseFlow::assembleResidual()
 
         PfP           = SP * PlP + (1.-SP) * varPg(cellP);
         PhiPn         = cellP.Real(Phi_old);
-        PhiP          = PhiPn + c_phi * (PfP - cellP.Real(Pf_old));
+        //PhiP          = PhiPn + c_phi * (PfP - cellP.Real(Pf_old));
+        PhiP          = PhiPn / (1. - c_phi * (PfP - cellP.Real(Pf_old)));
 
         massL         = rhol *     SP   * PhiP;//varPhi(cellP);
         massG         = rhog * (1.-SP)  * PhiP;//varPhi(cellP);
@@ -572,7 +596,7 @@ void TwoPhaseFlow::assembleResidual()
 
         R[varX.Index(cellP)]   = (massL - massL_old)/dt;// * V;
         R[varPg.Index(cellP)]  = (massG - massG_old)/dt;// * V;
-        //R[varPg.Index(cellP)]  = varPg(cellP) - 1e6;
+        //R[varPg.Index(cellP)]  = varPg(cellP) - Pg0;
 
         //R[varPhi.Index(cellP)] = (varPhi(cellP) - cellP.Real(Phi_old))/dt - c_phi*(PfP - cellP.Real(Pf_old))/dt;
         //R[varPhi.Index(cellP)] *= V;
@@ -638,6 +662,7 @@ void TwoPhaseFlow::assembleResidual()
 
                     variable PlBC, PgBC;
                     // Pf = S*Pl + (1-S)*Pg = Pg + S*(Pl-Pg) = Pg - S*Pc
+                    //SP = 1.0;//
                     PgBC = PBC + SP*get_Pc(SP);
                     PlBC = (PBC - (1.-SP)*PgBC)/SP;
                     variable Krl, Krg;
@@ -699,8 +724,8 @@ void TwoPhaseFlow::assembleResidual()
                 else
                     Krg = KrgN;
 
-                if(Krg.GetValue() < 1e-9)
-                    Krg = 1e-9;
+//                if(Krg.GetValue() < 1e-9)
+//                    Krg = 1e-9;
 
                 double K, KN = cellN.Real(Perm);
 
@@ -724,10 +749,19 @@ void TwoPhaseFlow::setInitialConditions()
     double t = Timer();
     mass = 0.0;
     srand(time(nullptr));
+
+    Tag Ref = mesh->CreateTag("REF", DATA_REAL, CELL, NONE, 1);
+
     for(auto icell = mesh->BeginCell(); icell != mesh->EndCell(); icell++){
         if(icell->GetStatus() == Element::Ghost) continue;
 
-        icell->Real(Perm) = K0;
+
+        double x[3];
+        icell->Barycenter(x);
+        icell->Real(Ref) = mul/rhol/K0*inflowFluxL/inflowArea*(x[2]-0.012) + outflowPresF;
+
+        //if(!loadMesh)
+            icell->Real(Perm) = K0;// * (0.5 + rand()/(double)RAND_MAX);
 
         icell->Real(Pg) = Pg0;
         icell->Real(Sl) = Sl0;
@@ -741,7 +775,8 @@ void TwoPhaseFlow::setInitialConditions()
         }
         double S = icell->Real(Sl);
         icell->Real(Pc) = (get_Pc(S)).GetValue();
-        icell->Real(Pl) = icell->Real(Pg) - icell->Real(Pc);
+        icell->Real(Pl) = 8e6;//icell->Real(Pg) - icell->Real(Pc);
+        icell->Real(Pg) = icell->Real(Pl) + (get_Pc(S)).GetValue();
         icell->Real(Pf) = S * icell->Real(Pl) + (1.-S) * icell->Real(Pg);
         icell->Real(Phi) = phi0;
 
@@ -754,7 +789,9 @@ void TwoPhaseFlow::setInitialConditions()
 //        if(mesh->HaveTag("K"))
 //            KK = mesh->GetTag("K");
 //        if(mesh->HaveTag("Perm"))
-//            KK = mesh->GetTag("K");
+//            KK = mesh->GetTag("Perm");
+//        if(mesh->HaveTag("Permeability"))
+//            KK = mesh->GetTag("Permeability");
         if(mesh->HaveTag("Permeability_scalar"))
             KK = mesh->GetTag("Permeability_scalar");
         else {
@@ -776,7 +813,7 @@ void TwoPhaseFlow::setInitialConditions()
 
 
             icell->Real(Pg) = Pg0;
-            if(r < 400.)
+            if(r < 200.)
                 icell->Real(Sl) = Sl0_c;
             else {
                 icell->Real(Sl) = Sl0;
@@ -808,7 +845,8 @@ void TwoPhaseFlow::setBoundaryConditions()
 
     double t = Timer();
     ElementArray<Face> inflowFaces;
-    double inflowArea = 0.0;
+    inflowArea = 0.0;
+    Tag ref = mesh->GetTag("REF");
     for(auto iface = mesh->BeginFace(); iface != mesh->EndFace(); iface++){
         if(iface->GetStatus() == Element::Ghost) continue;
 
@@ -826,6 +864,7 @@ void TwoPhaseFlow::setBoundaryConditions()
                 inflowArea += face.Area();
                 inflowFaces.push_back(face);
                 inflowCells.push_back(face.BackCell());
+                face.BackCell().Real(ref) = -1e20;
             }
         }
 
@@ -840,6 +879,12 @@ void TwoPhaseFlow::setBoundaryConditions()
             }
         }
     }
+
+    iclsize = mesh->Integrate(static_cast<double>(inflowCells.size()));
+    if(rank == 0){
+        std::cout << "Number of inflow cells " << iclsize << std::endl;
+    }
+
 
     for(auto iface = inflowFaces.begin(); iface != inflowFaces.end(); iface++){
         Face face = iface->getAsFace();
@@ -887,12 +932,8 @@ void TwoPhaseFlow::countMass()
     mass = mass_new;
 }
 
-void TwoPhaseFlow::makeTimeStep()
+bool TwoPhaseFlow::makeTimeStep()
 {
-    // Save old values
-    copyTagReal(Sl_old, Sl, CELL);
-    copyTagReal(Pf_old, Pf, CELL);
-    copyTagReal(Phi_old, Phi, CELL);
 
     double r2, r2_0;
     double t;
@@ -905,7 +946,8 @@ void TwoPhaseFlow::makeTimeStep()
         std::cout << "Solver: " << solver_type << std::endl;
     }
     bool converged = false;
-    for(int iter = 0; iter < maxit; iter++){
+    int iter;
+    for(iter = 0; iter < maxit; iter++){
         setPrimaryVariables();
         assembleResidual();
 
@@ -933,10 +975,11 @@ void TwoPhaseFlow::makeTimeStep()
         if(!solved){
             std::cout << "Linear solver failed: " << S->GetReason() << std::endl;
             std::cout << "Residual: " << S->Residual() << std::endl;
-            exit(1);
+            //exit(1);
+            return false;
         }
         if(rank == 0)
-            std::cout << " Lin.it: " << S->Iterations() << std::endl;
+            std::cout << "  Lin.it: " << S->Iterations() << std::endl;
         iterLinear += S->Iterations();
         times[T_SOLVE] += Timer() - t;
 
@@ -947,7 +990,7 @@ void TwoPhaseFlow::makeTimeStep()
         copyTagReal(Phitmp, Phi, CELL);
         bool lsSuccess = false;
         w = 1.0;
-        for(int ils = 0; ils < 7; ils++){
+        for(int ils = 0; ils < 20; ils++){
             int gotBad = 0;
             for(auto icell = mesh->BeginCell(); icell != mesh->EndCell(); icell++){
                 if(icell->GetStatus() == Element::Ghost) continue;
@@ -975,10 +1018,14 @@ void TwoPhaseFlow::makeTimeStep()
                 double S = cell.Real(Sl);
                 cell.Real(Pf) = S*cell.Real(Pl) + (1.-S)*cell.Real(Pg);
                 cell.Real(Phi) = cell.Real(Phi_old) + c_phi*(cell.Real(Pf)-cell.Real(Pf_old));
+                if(cell.Real(Phi) > 1e5){
+                    printf("Bad porosity %e at cell %d\n", cell.Real(Phi), cell.LocalID());
+                    return false;
+                }
             }
             gotBad = mesh->Integrate(gotBad);
             if(gotBad){
-                w *= 0.25;
+                w *= 0.05;
                 if(rank == 0)
                     std::cout << "    Decreasing w to " << w << std::endl;
                 copyTagReal(Sl, Sltmp, CELL);
@@ -992,22 +1039,30 @@ void TwoPhaseFlow::makeTimeStep()
         }
         if(!lsSuccess){
             std::cout << "Line search failed" << std::endl;
-            mesh->Save("err" + outpExt);
-            exit(1);
+            //mesh->Save("err" + outpExt);
+            //exit(1);
+            return false;
         }
         times[T_UPDATE] += Timer() - t;
         mesh->ExchangeData(Pl, CELL);
         mesh->ExchangeData(Pg, CELL);
         mesh->ExchangeData(Pc, CELL);
+        mesh->ExchangeData(Pf, CELL);
         mesh->ExchangeData(Sl, CELL);
         mesh->ExchangeData(Phi, CELL);
         iterNewton++;
     }
     if(!converged){
         std::cout << "Newton failed" << std::endl;
-        mesh->Save("err" + outpExt);
-        exit(1);
+//        mesh->Save("err" + outpExt);
+//        exit(1);
+        return false;
     }
+    if(iter < 7)
+        dtnew = dt * 1.5;
+    else
+        dtnew = dt;
+    return true;
 }
 
 void TwoPhaseFlow::runSimulation()
@@ -1020,6 +1075,7 @@ void TwoPhaseFlow::runSimulation()
     times[T_IO] += Timer() - t;
 
     std::ofstream out("P.txt");
+    std::ofstream out1("Pt.txt");
 
     initAutodiff();
 
@@ -1028,30 +1084,74 @@ void TwoPhaseFlow::runSimulation()
     S->SetParameter("relative_tolerance","1e-6");
     S->SetParameter("maximum_iterations","2000");
     S->SetParameter("gmres_substeps","0");
-    S->SetParameter("drop_tolerance","1e-2");
+    S->SetParameter("condition_estimation","1");
+    S->SetParameter("schwartz_overlap","3");
+    S->SetParameter("drop_tolerance","1e-1");
 
     int nt = static_cast<int>(T/dt);
-    for(int it = 1; it <= nt; it++){
+    dt = 1e-1;
+    double tbeg = 0.0;
+    for(int it = 1; ; it++){
         if(rank == 0){
             std::cout << std::endl;
-            std::cout << "===== TIME STEP " << it << ", T = " << it*dt << " =====" << std::endl;
+            std::cout << "===== TIME STEP " << it << ", T_beg = " << tbeg << " =====" << std::endl;
         }
-        makeTimeStep();
+        // Save old values
+        copyTagReal(Sl_old, Sl, CELL);
+        copyTagReal(Pf_old, Pf, CELL);
+        copyTagReal(Pl_old, Pl, CELL);
+        copyTagReal(Pg_old, Pg, CELL);
+        copyTagReal(Phi_old, Phi, CELL);
+        bool found = false;
+        for(dt = std::min(dtDesir, std::min(T-tbeg, dt)); dt >= 1e-10; dt *= 0.5){
+            if(rank == 0)
+                std::cout << "Trying dt = " << dt << std::endl;
+            bool success = makeTimeStep();
+            if(success){
+                found = true;
+                break;
+            }
+            else {
+                copyTagReal(Sl, Sl_old, CELL);
+                copyTagReal(Pf, Pf_old, CELL);
+                copyTagReal(Pl, Pl_old, CELL);
+                copyTagReal(Pg, Pg_old, CELL);
+                copyTagReal(Phi, Phi_old, CELL);
+            }
+        }
+        if(!found){
+            std::cout << "Failed to find dt" << std::endl;
+            exit(2);
+        }
         countMass();
 
-        if(it%saveIntensity == 0){
-            t = Timer();
-            if(saveSol)
-                mesh->Save(save_dir + "/sol" + std::to_string(it/saveIntensity) + outpExt);
 
-            if(inflowCells.size() > 0){
-                double avPin = 0.0;
-                for(auto icell = inflowCells.begin(); icell != inflowCells.end(); icell++)
-                    avPin += icell->Real(Pl);
-                out << avPin/inflowCells.size() << std::endl;
-            }
-            times[T_IO] += Timer() - t;
+        t = Timer();
+        if(it%saveIntensity == 0 && saveSol){
+            mesh->Save(save_dir + "/sol" + std::to_string(it/saveIntensity) + outpExt);
         }
+        //printf("proc %d of %d, size = %lf\n", rank, mesh->GetProcessorsNumber(), iclsize);
+        //MPI_Barrier(INMOST_MPI_COMM_WORLD);
+        if(iclsize > 0){
+            double avPin = 0.0;
+            for(auto icell = inflowCells.begin(); icell != inflowCells.end(); icell++){
+                if(icell->GetStatus() != Element::Ghost)
+                avPin += icell->Real(Pf);
+            }
+            avPin = mesh->Integrate(avPin);
+            if(rank == 0){
+                printf("avPin = %e\n", avPin/iclsize);
+                out << 1e-6*avPin/iclsize << std::endl;
+                out1 << tbeg+dt << "\t" << 1e-6*avPin/iclsize << std::endl;
+            }
+        }
+        times[T_IO] += Timer() - t;
+
+        tbeg += dt;
+        if(tbeg > T - 1e-5)
+            break;
+
+        dt = dtnew;
     }
 
     delete S;
