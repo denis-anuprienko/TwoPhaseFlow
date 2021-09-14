@@ -848,6 +848,8 @@ void TwoPhaseFlow::setBoundaryConditions()
 
     double t = Timer();
     ElementArray<Face> inflowFaces;
+    inflowFaces.SetMeshLink(mesh);
+    inflowCells.SetMeshLink(mesh);
     inflowArea = 0.0;
     Tag ref = mesh->GetTag("REF");
     for(auto iface = mesh->BeginFace(); iface != mesh->EndFace(); iface++){
