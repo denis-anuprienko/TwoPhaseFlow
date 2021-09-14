@@ -853,8 +853,6 @@ void TwoPhaseFlow::setBoundaryConditions()
     inflowArea = 0.0;
     Tag ref = mesh->GetTag("REF");
     for(auto iface = mesh->BeginFace(); iface != mesh->EndFace(); iface++){
-        if(iface->GetStatus() == Element::Ghost) continue;
-
         Face face = iface->getAsFace();
         if(!face.Boundary())
             continue;
@@ -869,6 +867,8 @@ void TwoPhaseFlow::setBoundaryConditions()
                 inflowArea += face.Area();
                 inflowFaces.push_back(face);
                 inflowCells.push_back(face.BackCell());
+
+
                 face.BackCell().Real(ref) = -1e20;
             }
         }
