@@ -172,7 +172,8 @@ void TwoPhaseFlow::readParams(std::string path)
     //std::cout << "Pdnstr " << outflowPresL << std::endl;
     times[T_IO] += Timer() - t;
 
-    printf("mu/k/rho RATIO = %e\n", mul/K0/rhol);
+    if(rank == 0)
+        printf("mu/k/rho RATIO = %e\n", mul/K0/rhol);
 }
 
 void TwoPhaseFlow::setMesh()
@@ -221,7 +222,8 @@ void TwoPhaseFlow::setMesh()
     mesh->AssignGlobalID(CELL|FACE);
     times[T_INIT] += Timer() - t;
 
-    std::cout << "Finished partitioning" << std::endl;
+    if(rank == 0)
+        std::cout << "Finished partitioning" << std::endl;
 }
 
 void TwoPhaseFlow::readMesh(std::string path)
@@ -269,7 +271,8 @@ void TwoPhaseFlow::createMesh()
 {
     double t = Timer();
     if(problem_name != "2phase_center"){
-        std::cout << "Trying to create mesh for unknown problem" << std::endl;
+        if(rank == 0)
+            std::cout << "Trying to create mesh for unknown problem" << std::endl;
     }
 
     double L = 0.012;
@@ -887,6 +890,9 @@ void TwoPhaseFlow::setBoundaryConditions()
 
 
     for(auto iface = inflowFaces.begin(); iface != inflowFaces.end(); iface++){
+        if(iface->GetStatus() == Element::Ghost)
+            continue;
+
         Face face = iface->getAsFace();
         //std::cout << "Top boundary face " << face.GlobalID() << ", z = " << x[2] << std::endl;
         face.IntegerArray(BCtype)[BCAT_L] = BC_NEUM;
@@ -1026,6 +1032,12 @@ bool TwoPhaseFlow::makeTimeStep()
             gotBad = mesh->Integrate(gotBad);
             if(gotBad){
                 w *= 0.05;
+
+                if(w < 1e-5){
+                    lsSuccess = false;
+                    break;
+                }
+
                 if(rank == 0)
                     std::cout << "    Decreasing w to " << w << std::endl;
                 copyTagReal(Sl, Sltmp, CELL);
