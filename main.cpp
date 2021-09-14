@@ -1026,6 +1026,12 @@ bool TwoPhaseFlow::makeTimeStep()
             gotBad = mesh->Integrate(gotBad);
             if(gotBad){
                 w *= 0.05;
+
+                if(w < 1e-5){
+                    lsSuccess = false;
+                    break;
+                }
+
                 if(rank == 0)
                     std::cout << "    Decreasing w to " << w << std::endl;
                 copyTagReal(Sl, Sltmp, CELL);
