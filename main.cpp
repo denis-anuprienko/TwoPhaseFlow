@@ -981,8 +981,10 @@ bool TwoPhaseFlow::makeTimeStep()
         t = Timer();
         bool solved = S->Solve(R.GetResidual(), sol);
         if(!solved){
-            std::cout << "Linear solver failed: " << S->GetReason() << std::endl;
-            std::cout << "Residual: " << S->Residual() << std::endl;
+            if(rank == 0){
+                std::cout << "Linear solver failed: " << S->GetReason() << std::endl;
+                std::cout << "Residual: " << S->Residual() << std::endl;
+            }
             //exit(1);
             return false;
         }
@@ -1008,7 +1010,7 @@ bool TwoPhaseFlow::makeTimeStep()
                 if(cell.Integer(PV) == PV_SAT){
                     double Snew = cell.Real(Sl) - w*sol[varX.Index(cell)];
                     if(Snew > 1.0 || Snew < 0.0){
-                        std::cout << "    Bad Sl = " << Snew << " at cell " << cell.GlobalID() << std::endl;
+                        //std::cout << "    Bad Sl = " << Snew << " at cell " << cell.GlobalID() << std::endl;
                         gotBad = 1;
                         break;
                     }
@@ -1027,7 +1029,7 @@ bool TwoPhaseFlow::makeTimeStep()
                 cell.Real(Pf) = S*cell.Real(Pl) + (1.-S)*cell.Real(Pg);
                 cell.Real(Phi) = cell.Real(Phi_old) + c_phi*(cell.Real(Pf)-cell.Real(Pf_old));
                 if(cell.Real(Phi) > 1e5){
-                    printf("Bad porosity %e at cell %d\n", cell.Real(Phi), cell.LocalID());
+                    //printf("Bad porosity %e at cell %d\n", cell.Real(Phi), cell.LocalID());
                     return false;
                 }
             }
@@ -1052,7 +1054,8 @@ bool TwoPhaseFlow::makeTimeStep()
             }
         }
         if(!lsSuccess){
-            std::cout << "Line search failed" << std::endl;
+            if(rank == 0)
+                std::cout << "Line search failed" << std::endl;
             //mesh->Save("err" + outpExt);
             //exit(1);
             return false;
@@ -1067,7 +1070,8 @@ bool TwoPhaseFlow::makeTimeStep()
         iterNewton++;
     }
     if(!converged){
-        std::cout << "Newton failed" << std::endl;
+        if(rank == 0)
+            std::cout << "Newton failed" << std::endl;
 //        mesh->Save("err" + outpExt);
 //        exit(1);
         return false;
