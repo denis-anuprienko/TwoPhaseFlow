@@ -45,7 +45,19 @@ int main(int argc, char *argv[])
                 const INMOST_DATA_INTEGER_TYPE face_nodes[24] = {0,4,6,2, 1,3,7,5, 0,1,5,4, 2,6,7,3, 0,2,3,1, 4,5,7,6};
                 const INMOST_DATA_INTEGER_TYPE num_nodes[6]   = {4,       4,       4,       4,       4,       4};
 
-                mesh->CreateCell(verts,face_nodes,num_nodes,6); // Create the cubic cell in the mesh
+                double avX[3] = {0.,0.,0.};
+                for(auto iv = verts.begin(); iv != verts.end(); iv++){
+                    double x[3];
+                    iv->Barycenter(x);
+                    for(int i = 0; i < 3; i++)
+                        avX[i] += x[i]/verts.size();
+                }
+                double r = 0.0;
+                for(int i = 0; i < 2; i++)
+                    r += (avX[i]-0.006)*(avX[i]-0.006);
+                //printf("r = %lf\n", sqrt(r));
+                if(sqrt(r) < 0.006)
+                    mesh->CreateCell(verts,face_nodes,num_nodes,6); // Create the cubic cell in the mesh
             }
         }
     }
