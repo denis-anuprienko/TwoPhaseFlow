@@ -1100,11 +1100,11 @@ void TwoPhaseFlow::runSimulation()
     S = new Solver(solver_type);
     S->SetParameter("absolute_tolerance","1e-10");
     S->SetParameter("relative_tolerance","1e-6");
-    S->SetParameter("maximum_iterations","2000");
+    S->SetParameter("maximum_iterations","100");
     S->SetParameter("gmres_substeps","0");
     S->SetParameter("condition_estimation","1");
     S->SetParameter("schwartz_overlap","3");
-    S->SetParameter("drop_tolerance","1e-1");
+    S->SetParameter("drop_tolerance","1e-2");
 
     int nt = static_cast<int>(T/dt);
     dt = 1e-1;
