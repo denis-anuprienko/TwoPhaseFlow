@@ -890,6 +890,9 @@ void TwoPhaseFlow::setBoundaryConditions()
 
 
     for(auto iface = inflowFaces.begin(); iface != inflowFaces.end(); iface++){
+        if(iface->GetStatus() == Element::Ghost)
+            continue;
+
         Face face = iface->getAsFace();
         //std::cout << "Top boundary face " << face.GlobalID() << ", z = " << x[2] << std::endl;
         face.IntegerArray(BCtype)[BCAT_L] = BC_NEUM;
