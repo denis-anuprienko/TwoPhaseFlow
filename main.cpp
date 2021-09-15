@@ -865,11 +865,12 @@ void TwoPhaseFlow::setBoundaryConditions()
             double r = (x[0]-0.006)*(x[0]-0.006) + (x[1]-0.006)*(x[1]-0.006);
             r = sqrt(r);
             if(r <= injectRadius){
-                inflowArea += face.Area();
                 inflowFaces.push_back(face);
                 inflowCells.push_back(face.BackCell());
-                if(face.BackCell().GetStatus() != Element::Ghost)
+                if(face.BackCell().GetStatus() != Element::Ghost){
                     iclsize += 1.0;
+                    inflowArea += face.Area();
+                }
                 face.BackCell().Real(ref) = -1e20;
             }
         }
@@ -887,8 +888,10 @@ void TwoPhaseFlow::setBoundaryConditions()
     }
 
     iclsize = mesh->Integrate(static_cast<double>(inflowCells.size()));
+    inflowArea = mesh->Integrate(inflowArea);
     if(rank == 0){
         std::cout << "Number of inflow cells " << iclsize << std::endl;
+        std::cout << "Inflow area: " << inflowArea << std::endl;
     }
 
 
