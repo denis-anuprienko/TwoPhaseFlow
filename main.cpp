@@ -17,7 +17,7 @@ TwoPhaseFlow::TwoPhaseFlow()
     if(mesh->GetProcessorsNumber() == 1)
         outpExt = ".vtk";
     else
-        outpExt = ".pvtk";
+        outpExt = ".pvtu";
 }
 
 TwoPhaseFlow::~TwoPhaseFlow()
@@ -532,6 +532,24 @@ variable TwoPhaseFlow::get_Sl(variable Pcc)
     return pow(1.0 + pow(vg_a/rhol/g*Pcc, vg_n), -vg_m);
 }
 
+variable TwoPhaseFlow::get_Poro(variable PfP, double PfPn, double PhiPn)
+{
+    //return PhiPn + c_phi * (PfP - PfPn);
+    return PhiPn / (1. - c_phi/PfP * (PfP - PfPn));
+    //return phi0 * pow(PfP/0.1e6, -c_phi);
+}
+
+double TwoPhaseFlow::get_Poro(double PfP, double PfPn, double PhiPn)
+{
+    return get_Poro(variable(PfP), PfPn, PhiPn).GetValue();
+}
+
+variable TwoPhaseFlow::get_Ke(variable PfP)
+{
+    return exp(-gamma*(Pt - PfP - 0.1e6));
+    //return pow(PfP/0.1e6, -c_phi);
+}
+
 variable TwoPhaseFlow::get_Pc(variable S)
 {
     if(S.GetValue() < 0.0 || S.GetValue() > 1.0){
@@ -589,8 +607,7 @@ void TwoPhaseFlow::assembleResidual()
 
         PfP           = SP * PlP + (1.-SP) * varPg(cellP);
         PhiPn         = cellP.Real(Phi_old);
-        //PhiP          = PhiPn + c_phi * (PfP - cellP.Real(Pf_old));
-        PhiP          = PhiPn / (1. - c_phi * (PfP - cellP.Real(Pf_old)));
+        PhiP          = get_Poro(PfP, cellP.Real(Pf_old), cellP.Real(Phi_old));
 
         massL         = rhol *     SP   * PhiP;//varPhi(cellP);
         massG         = rhog * (1.-SP)  * PhiP;//varPhi(cellP);
@@ -629,7 +646,8 @@ void TwoPhaseFlow::assembleResidual()
                     double PlBC = face.RealArray(BCval)[BCAT_L];
                     variable Krl, Krg;
                     get_Kr(SP, Krl, Krg);
-                    variable Ke = exp(-gamma*(Pt - PfP - 0.1e6));
+                    //variable Ke = exp(-gamma*(Pt - PfP - 0.1e6));
+                    variable Ke = get_Ke(PfP);
 
                     double coef = face.Real(TCoeff);
 
@@ -1031,17 +1049,19 @@ bool TwoPhaseFlow::makeTimeStep()
                 //cell.Real(Phi) -= sol[varPhi.Index(cell)];
                 double S = cell.Real(Sl);
                 cell.Real(Pf) = S*cell.Real(Pl) + (1.-S)*cell.Real(Pg);
-                cell.Real(Phi) = cell.Real(Phi_old) + c_phi*(cell.Real(Pf)-cell.Real(Pf_old));
+                cell.Real(Phi) = get_Poro(cell.Real(Pf), cell.Real(Pf_old), cell.Real(Phi_old));//cell.Real(Phi_old) + c_phi/cell.Real(Pf)*(cell.Real(Pf)-cell.Real(Pf_old));
                 if(cell.Real(Phi) > 1e5){
                     //printf("Bad porosity %e at cell %d\n", cell.Real(Phi), cell.LocalID());
                     return false;
                 }
             }
+
+            //std::cout << "Here" << std::endl;
             gotBad = mesh->Integrate(gotBad);
             if(gotBad){
                 w *= 0.05;
 
-                if(w < 1e-5){
+                if(w < 1e-8){
                     lsSuccess = false;
                     break;
                 }

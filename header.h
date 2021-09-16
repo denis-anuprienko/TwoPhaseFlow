@@ -136,6 +136,9 @@ public:
     void computeTPFAcoeff();
     variable get_Sl(variable Pcc);
     variable get_Pc(variable S);
+    variable get_Poro(variable PfP, double PfPn, double PhiPn);
+    double get_Poro(double PfP, double PfPn, double PhiPn);
+    variable get_Ke(variable PfP);
     void get_Kr(variable S, variable &Krl, variable &Krg);
     void assembleResidual();
     void copyTagReal(Tag Dest, Tag Src, ElementType mask);
