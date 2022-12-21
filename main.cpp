@@ -1174,7 +1174,7 @@ void TwoPhaseFlow::runSimulation()
     times[T_IO] += Timer() - t;
 
     std::ofstream out("P.txt");
-    std::ofstream out1("Pt.txt");
+    std::ofstream out1("t.txt");
 
     initAutodiff();
 
@@ -1242,7 +1242,7 @@ void TwoPhaseFlow::runSimulation()
             if(rank == 0){
                 printf("avPin = %e\n", avPin/iclsize);
                 out << 1e-6*avPin/iclsize << std::endl;
-                out1 << tbeg+dt << "\t" << 1e-6*avPin/iclsize << std::endl;
+                out1 << tbeg+dt << std::endl;// << "\t" << 1e-6*avPin/iclsize << std::endl;
             }
         }
         times[T_IO] += Timer() - t;
