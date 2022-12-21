@@ -149,6 +149,7 @@ public:
     void setPrimaryVariables();
     void initAutodiff();
     void countMass();
+    void computeFluxes();
     bool makeTimeStep();
     void runSimulation();
 };

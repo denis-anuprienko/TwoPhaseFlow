@@ -962,6 +962,63 @@ void TwoPhaseFlow::countMass()
     mass = mass_new;
 }
 
+void TwoPhaseFlow::computeFluxes()
+{
+    // First, compute fluxes for faces
+    Tag tagFluxL = mesh->CreateTag("Flux_L", DATA_REAL, FACE, NONE, 1);
+    Tag tagFluxG = mesh->CreateTag("Flux_G", DATA_REAL, FACE, NONE, 1);
+    for(auto iface = mesh->BeginFace(); iface != mesh->EndFace(); iface++){
+        if(iface->GetStatus() == Element::Ghost)
+            continue;
+        Face f = iface->getAsFace();
+        if(f.Boundary())
+            continue; // !!! TODO
+        Cell cB = f.BackCell(), cF = f.FrontCell();
+        f.Real(tagFluxL) = f.Real(TCoeff) * (cF.Real(Pl) - cB.Real(Pl));
+        f.Real(tagFluxG) = f.Real(TCoeff) * (cF.Real(Pg) - cB.Real(Pg));
+    }
+    mesh->ExchangeData(tagFluxL, FACE);
+    mesh->ExchangeData(tagFluxG, FACE);
+
+    Tag Lflux, Gflux;
+    if(mesh->HaveTag("Liquid_Flux"))
+        Lflux = mesh->GetTag("Liquid_Flux");
+    else
+        Lflux = mesh->CreateTag("Liquid_Flux", DATA_REAL, CELL, NONE, 3);
+    if(mesh->HaveTag("Gas_Flux"))
+        Gflux = mesh->GetTag("Gas_Flux");
+    else
+        Gflux = mesh->CreateTag("Gas_Flux", DATA_REAL, CELL, NONE, 3);
+
+    for(auto icell = mesh->BeginCell(); icell != mesh->EndCell(); icell++){
+        if(icell->GetStatus() == Element::Ghost)
+            continue;
+        Cell c = icell->getAsCell();
+        auto faces = icell->getFaces();
+        unsigned m = static_cast<unsigned>(faces.size());
+        double cfluxL[3] = {0., 0., 0.};
+        double cfluxG[3] = {0., 0., 0.};
+        for(unsigned k = 0; k < m; k++){
+            double nor[3];
+            faces[k].UnitNormal(nor);
+            for(int i = 0; i < 3; i++){
+                cfluxL[i] += nor[i] * faces[k].Real(tagFluxL);
+                cfluxG[i] += nor[i] * faces[k].Real(tagFluxG);
+            }
+        }
+        for(unsigned i = 0; i < 3; i++){
+            icell->RealArray(Lflux)[i] = cfluxL[i]/m;
+            icell->RealArray(Gflux)[i] = cfluxG[i]/m;
+        }
+
+    }
+    mesh->ExchangeData(Lflux, CELL);
+    mesh->ExchangeData(Gflux, CELL);
+
+    mesh->DeleteTag(tagFluxL);
+    mesh->DeleteTag(tagFluxG);
+}
+
 bool TwoPhaseFlow::makeTimeStep()
 {
 
@@ -1166,6 +1223,7 @@ void TwoPhaseFlow::runSimulation()
             exit(2);
         }
         countMass();
+        computeFluxes();
 
 
         t = Timer();
