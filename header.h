@@ -79,30 +79,32 @@ private:
     Mesh *mesh;
 
     // Tags
-    Tag Sl;      // Liquid saturation
-    Tag Sl_old;  // Liquid saturation at the previous time step
-    Tag Pl;      // Liquid pressure
+	Tag Sl;        // Liquid saturation
+	Tag Sl_old;    // Liquid saturation at the previous time step
+	Tag Pl;        // Liquid pressure
     Tag Pl_old;
-    Tag Pg;      // Gas pressure
+	Tag Pg;        // Gas pressure
     Tag Pg_old;
-    Tag Pc;      // Capillary pressure
-    Tag Pf;      // Phase-averaged fluid pressure
-    Tag Pf_old;  // Phase-averaged fluid pressure at the previous time step
-    Tag Phi;     // Porosity
-    Tag Phi_old; // Porosity at the previous time step
-    Tag X;       // Cellwise variable X (either Sl or Pl)
-    Tag Perm;    // Medium reference instrinsic permeability
-    Tag PV;      // Primary variable type indicator
-    Tag TCoeff;  // TPFA coefficient for faces
-    Tag Grav;    // TPFA approximated gravity term
+	Tag Pc;        // Capillary pressure
+	Tag Pf;        // Phase-averaged fluid pressure
+	Tag Pf_old;    // Phase-averaged fluid pressure at the previous time step
+	Tag Phi;       // Porosity
+	Tag Phi_old;   // Porosity at the previous time step
+	Tag X;         // Cellwise variable X (either Sl or Pl)
+	Tag Perm;      // Medium reference instrinsic permeability
+	Tag PV;        // Primary variable type indicator
+	Tag TCoeff;    // TPFA coefficient for faces
+	Tag Grav;      // TPFA approximated gravity term
+	Tag fluxFaceL; // Liquid flux on faces
+	Tag fluxFaceG; // Gas    flux on faces
 
-    Tag Sltmp;   // Temporary tag for Sl
-    Tag Xtmp;    // Temporary tag for Xl
-    Tag Pgtmp;   // Temporary tag for Pg
-    Tag Phitmp;  // Temporary tag for Phi
+	Tag Sltmp;     // Temporary tag for Sl
+	Tag Xtmp;      // Temporary tag for Xl
+	Tag Pgtmp;     // Temporary tag for Pg
+	Tag Phitmp;    // Temporary tag for Phi
 
-    Tag BCtype;  // BC type: Neumann, Dirichlet
-    Tag BCval;   // BC value: pressure or flux
+	Tag BCtype;    // BC type: Neumann, Dirichlet
+	Tag BCval;     // BC value: pressure or flux
 
     // Autodiff things
     Automatizator *aut;

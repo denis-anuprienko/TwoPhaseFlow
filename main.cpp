@@ -382,28 +382,30 @@ void TwoPhaseFlow::createMesh()
 void TwoPhaseFlow::initTags()
 {
     double t = Timer();
-    Sl       = mesh->CreateTag("Liquid_Saturation",     DATA_REAL,    CELL, false, 1);
-    Pl       = mesh->CreateTag("Liquid_Pressure",       DATA_REAL,    CELL, false, 1);
-    Pc       = mesh->CreateTag("Capillary_Pressure",    DATA_REAL,    CELL, false, 1);
-    Pg       = mesh->CreateTag("Gas_Pressure",          DATA_REAL,    CELL, false, 1);
-    Pf       = mesh->CreateTag("Fluid_Pressure",        DATA_REAL,    CELL, false, 1);
-    Pf_old   = mesh->CreateTag("Fluid_Pressure_Old",    DATA_REAL,    CELL, false, 1);
-    Pl_old   = mesh->CreateTag("Liquid_Pressure_Old",   DATA_REAL,    CELL, false, 1);
-    Pg_old   = mesh->CreateTag("Gas_Pressure_Old",      DATA_REAL,    CELL, false, 1);
-    X        = mesh->CreateTag("Primary_Variable",      DATA_REAL,    CELL, false, 1);
-    Perm     = mesh->CreateTag("Permeability",          DATA_REAL,    CELL, false, 1);
-    Phi      = mesh->CreateTag("Porosity",              DATA_REAL,    CELL, false, 1);
-    Phi_old  = mesh->CreateTag("Porosity_Old",          DATA_REAL,    CELL, false, 1);
-    PV       = mesh->CreateTag("Primary_Variable_Type", DATA_INTEGER, CELL, false, 1);
-    Sl_old   = mesh->CreateTag("Liquid_Saturation_Old", DATA_REAL,    CELL, false, 1);
-    TCoeff   = mesh->CreateTag("TPFA_Coefficient",      DATA_REAL,    FACE, false, 1);
-    Grav     = mesh->CreateTag("Gravity",               DATA_REAL,    FACE, false, 1);
-    Sltmp    = mesh->CreateTag("Sl_tmp",                DATA_REAL,    CELL, false, 1);
-    Xtmp     = mesh->CreateTag("X_tmp",                 DATA_REAL,    CELL, false, 1);
-    Pgtmp    = mesh->CreateTag("Pg_tmp",                DATA_REAL,    CELL, false, 1);
-    Phitmp   = mesh->CreateTag("Phi_tmp",               DATA_REAL,    CELL, false, 1);
-    BCtype   = mesh->CreateTag("BCtype",                DATA_INTEGER, FACE, FACE,  3);
-    BCval    = mesh->CreateTag("BCval",                 DATA_REAL,    FACE, FACE,  3);
+	Sl        = mesh->CreateTag("Liquid_Saturation",     DATA_REAL,    CELL, false, 1);
+	Pl        = mesh->CreateTag("Liquid_Pressure",       DATA_REAL,    CELL, false, 1);
+	Pc        = mesh->CreateTag("Capillary_Pressure",    DATA_REAL,    CELL, false, 1);
+	Pg        = mesh->CreateTag("Gas_Pressure",          DATA_REAL,    CELL, false, 1);
+	Pf        = mesh->CreateTag("Fluid_Pressure",        DATA_REAL,    CELL, false, 1);
+	Pf_old    = mesh->CreateTag("Fluid_Pressure_Old",    DATA_REAL,    CELL, false, 1);
+	Pl_old    = mesh->CreateTag("Liquid_Pressure_Old",   DATA_REAL,    CELL, false, 1);
+	Pg_old    = mesh->CreateTag("Gas_Pressure_Old",      DATA_REAL,    CELL, false, 1);
+	X         = mesh->CreateTag("Primary_Variable",      DATA_REAL,    CELL, false, 1);
+	Perm      = mesh->CreateTag("Permeability",          DATA_REAL,    CELL, false, 1);
+	Phi       = mesh->CreateTag("Porosity",              DATA_REAL,    CELL, false, 1);
+	Phi_old   = mesh->CreateTag("Porosity_Old",          DATA_REAL,    CELL, false, 1);
+	PV        = mesh->CreateTag("Primary_Variable_Type", DATA_INTEGER, CELL, false, 1);
+	Sl_old    = mesh->CreateTag("Liquid_Saturation_Old", DATA_REAL,    CELL, false, 1);
+	TCoeff    = mesh->CreateTag("TPFA_Coefficient",      DATA_REAL,    FACE, false, 1);
+	Grav      = mesh->CreateTag("Gravity",               DATA_REAL,    FACE, false, 1);
+	fluxFaceL = mesh->CreateTag("fluxFaceL",             DATA_REAL,    FACE, false, 1);
+	fluxFaceG = mesh->CreateTag("fluxFaceG",             DATA_REAL,    FACE, false, 1);
+	Sltmp     = mesh->CreateTag("Sl_tmp",                DATA_REAL,    CELL, false, 1);
+	Xtmp      = mesh->CreateTag("X_tmp",                 DATA_REAL,    CELL, false, 1);
+	Pgtmp     = mesh->CreateTag("Pg_tmp",                DATA_REAL,    CELL, false, 1);
+	Phitmp    = mesh->CreateTag("Phi_tmp",               DATA_REAL,    CELL, false, 1);
+	BCtype    = mesh->CreateTag("BCtype",                DATA_INTEGER, FACE, FACE,  3);
+	BCval     = mesh->CreateTag("BCval",                 DATA_REAL,    FACE, FACE,  3);
 
     // Some tags don't need to be printed
     X.SetPrint(false);
@@ -640,6 +642,7 @@ void TwoPhaseFlow::assembleResidual()
                 if(faceBCtypeL == BC_NEUM){
                     //std::cout << "Face with Neumann BC for liquid" << std::endl;
                     ql = face.Area()*face.RealArray(BCval)[BCAT_L];
+					face.Real(fluxFaceL) = ql.GetValue();
                 }
                 else if(faceBCtypeL == BC_DIR){
                     std::cout << "Face with Dirichlet BC for liquid" << std::endl;
@@ -652,6 +655,7 @@ void TwoPhaseFlow::assembleResidual()
                     double coef = face.Real(TCoeff);
 
                     ql = -rhol*Krl*KP*Ke/mul * coef * (PlP - PlBC);
+					face.Real(fluxFaceL) = ql.GetValue();
                 }
 
                 // Gas
@@ -694,6 +698,9 @@ void TwoPhaseFlow::assembleResidual()
 
                     ql = -rhol*Krl*KP*Ke/mul * coef * (PlP - PlBC);
                     qg = -rhog*Krg*KP*Ke/mug * coef * (varPg(cellP) - PgBC);
+
+					face.Real(fluxFaceL) = ql.GetValue();
+					face.Real(fluxFaceG) = qg.GetValue();
                 }
 
                 R[varX.Index(cellP)] -= ql / V;
@@ -754,6 +761,9 @@ void TwoPhaseFlow::assembleResidual()
 
                 ql = -rhol*Krl*K*Ke/mul * coef * (PlP - PlN);
                 qg = -rhog*Krg*K*Ke/mug * coef * (varPg(cellP) - varPg(cellN));
+
+				face.Real(fluxFaceL) = ql.GetValue();
+				face.Real(fluxFaceG) = qg.GetValue();
 
                 R[varX.Index(cellP)] += ql/V;
                 R[varPg.Index(cellP)] += qg/V;
@@ -966,22 +976,6 @@ void TwoPhaseFlow::countMass()
 
 void TwoPhaseFlow::computeFluxes()
 {
-    // First, compute fluxes for faces
-    Tag tagFluxL = mesh->CreateTag("Flux_L", DATA_REAL, FACE, NONE, 1);
-    Tag tagFluxG = mesh->CreateTag("Flux_G", DATA_REAL, FACE, NONE, 1);
-    for(auto iface = mesh->BeginFace(); iface != mesh->EndFace(); iface++){
-        if(iface->GetStatus() == Element::Ghost)
-            continue;
-        Face f = iface->getAsFace();
-        if(f.Boundary())
-            continue; // !!! TODO
-        Cell cB = f.BackCell(), cF = f.FrontCell();
-        f.Real(tagFluxL) = f.Real(TCoeff) * (cF.Real(Pl) - cB.Real(Pl));
-        f.Real(tagFluxG) = f.Real(TCoeff) * (cF.Real(Pg) - cB.Real(Pg));
-    }
-    mesh->ExchangeData(tagFluxL, FACE);
-    mesh->ExchangeData(tagFluxG, FACE);
-
     Tag Lflux, Gflux;
     if(mesh->HaveTag("Liquid_Flux"))
         Lflux = mesh->GetTag("Liquid_Flux");
@@ -1004,8 +998,8 @@ void TwoPhaseFlow::computeFluxes()
             double nor[3];
             faces[k].UnitNormal(nor);
             for(int i = 0; i < 3; i++){
-                cfluxL[i] += nor[i] * faces[k].Real(tagFluxL);
-                cfluxG[i] += nor[i] * faces[k].Real(tagFluxG);
+				cfluxL[i] += nor[i] * faces[k].Real(fluxFaceL);
+				cfluxG[i] += nor[i] * faces[k].Real(fluxFaceG);
             }
         }
         for(unsigned i = 0; i < 3; i++){
@@ -1016,9 +1010,6 @@ void TwoPhaseFlow::computeFluxes()
     }
     mesh->ExchangeData(Lflux, CELL);
     mesh->ExchangeData(Gflux, CELL);
-
-    mesh->DeleteTag(tagFluxL);
-    mesh->DeleteTag(tagFluxG);
 }
 
 bool TwoPhaseFlow::makeTimeStep()
