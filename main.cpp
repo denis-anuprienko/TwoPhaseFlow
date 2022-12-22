@@ -868,6 +868,7 @@ void TwoPhaseFlow::setBoundaryConditions()
     ElementArray<Face> inflowFaces;
     inflowFaces.SetMeshLink(mesh);
     inflowCells.SetMeshLink(mesh);
+    outflowFaces.SetMeshLink(mesh);
     inflowArea = 0.0;
     iclsize = 0.0;
     Tag ref = mesh->GetTag("REF");
@@ -901,6 +902,7 @@ void TwoPhaseFlow::setBoundaryConditions()
                 //std::cout << "Bottom boundary face " << face.GlobalID() << ", z = " << x[2] << std::endl;
                 face.IntegerArray(BCtype)[BCAT_F] = BC_DIR;
                 face.RealArray(BCval)[BCAT_F] = outflowPresF;
+                outflowFaces.push_back(face);
             }
         }
     }
@@ -1175,6 +1177,7 @@ void TwoPhaseFlow::runSimulation()
 
     std::ofstream out("P.txt");
     std::ofstream out1("t.txt");
+    std::ofstream out2("q.txt");
 
     initAutodiff();
 
@@ -1239,10 +1242,29 @@ void TwoPhaseFlow::runSimulation()
                 avPin += icell->Real(Pf);
             }
             avPin = mesh->Integrate(avPin);
+            double Q = 0.0; // outflow flux
+            for(auto iface = outflowFaces.begin(); iface != outflowFaces.end(); iface++){
+                if(iface->GetStatus() == Element::Ghost)
+                    continue;
+                Face f = iface->getAsFace();
+                Cell c = f.BackCell();
+                variable Krl, Krg;
+                get_Kr(c.Real(Sl), Krl,Krg);
+                variable Ke = get_Ke(c.Real(Pf));
+                double k = c.Real(Perm);
+                double t = f.Real(TCoeff);
+                double bcL = f.RealArray(BCval)[BCAT_L];
+                double bcG = f.RealArray(BCval)[BCAT_G];
+                double fluxL = -(k * rhol * Krl / mul * t * (bcL - c.Real(Pl))).GetValue();
+                double fluxG = -(k * rhol * Krl / mul * t * (bcG - c.Real(Pg))).GetValue();
+                Q += fluxL + fluxG;
+            }
+            Q = mesh->Integrate(Q);
             if(rank == 0){
                 printf("avPin = %e\n", avPin/iclsize);
                 out << 1e-6*avPin/iclsize << std::endl;
                 out1 << tbeg+dt << std::endl;// << "\t" << 1e-6*avPin/iclsize << std::endl;
+                out2 << Q << std::endl;
             }
         }
         times[T_IO] += Timer() - t;

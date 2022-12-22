@@ -121,6 +121,7 @@ private:
     int iterNewton;
     double mass;
     ElementArray<Cell> inflowCells;
+    ElementArray<Face> outflowFaces;
     double iclsize;
     int rank;
     std::string outpExt;
