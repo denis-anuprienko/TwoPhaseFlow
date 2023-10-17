@@ -4,6 +4,9 @@
 //#define V_ID(x, y, z) static_cast<unsigned long long>(((x-0)*(Ny+1)*(Nz+1) + (y-0)*(Nz+1) + (z-0)))
 #define V_ID(x, y, z) ((x-localstart[0])*(localsize[1]+1)*(localsize[2]+1) + (y-localstart[1])*(localsize[2]+1) + (z-localstart[2]))
 
+#define Rsample 0.0125
+#define Lsample 0.01
+
 double inflowArea;
 double dtDesir, dtnew;
 
@@ -275,8 +278,7 @@ void TwoPhaseFlow::createMesh()
             std::cout << "Trying to create mesh for unknown problem" << std::endl;
     }
 
-    double L = 0.012;
-    double dx = L/Nx, dy = L/Ny, dz = L/Nz;
+    double dx = 2*Rsample/Nx, dy = 2*Rsample/Ny, dz = Lsample/Nz;
 
     mesh = new Mesh;
 
@@ -366,9 +368,9 @@ void TwoPhaseFlow::createMesh()
                 }
                 double r = 0.0;
                 for(int i = 0; i < 2; i++)
-                    r += (avX[i]-0.006)*(avX[i]-0.006);
+                    r += (avX[i]-Rsample)*(avX[i]-Rsample);
                 //printf("r = %lf\n", sqrt(r));
-                if(sqrt(r) < 0.006)
+                if(sqrt(r) < Rsample)
                     mesh->CreateCell(verts,face_nodes,num_nodes,6); // Create the cubic cell in the mesh
             }
         }
@@ -535,7 +537,7 @@ variable TwoPhaseFlow::get_Sl(variable Pcc)
 variable TwoPhaseFlow::get_Poro(variable PfP, double PfPn, double PhiPn)
 {
     //return PhiPn + c_phi * (PfP - PfPn);
-    return PhiPn / (1. - c_phi/PfP * (PfP - PfPn));
+    return PhiPn / (1. - c_phi /* /PfP */ * (PfP - PfPn));
     //return phi0 * pow(PfP/0.1e6, -c_phi);
 }
 
@@ -779,7 +781,7 @@ void TwoPhaseFlow::setInitialConditions()
 
         double x[3];
         icell->Barycenter(x);
-        icell->Real(Ref) = mul/rhol/K0*inflowFluxL/inflowArea*(x[2]-0.012) + outflowPresF;
+        icell->Real(Ref) = mul/rhol/K0*inflowFluxL/inflowArea*(x[2]-Lsample) + outflowPresF;
 
         //if(!loadMesh)
             icell->Real(Perm) = K0;// * (0.5 + rand()/(double)RAND_MAX);
@@ -789,9 +791,9 @@ void TwoPhaseFlow::setInitialConditions()
         if(problem_name == "2phase_center"){
             double x[3];
             icell->Barycenter(x);
-            double r = (x[0]-0.006)*(x[0]-0.006) + (x[1]-0.006)*(x[1]-0.006);
+            double r = (x[0]-Rsample)*(x[0]-Rsample) + (x[1]-Rsample)*(x[1]-Rsample);
             r = sqrt(r);
-            if(r < 0.012 / 6.)
+            if(r < Rsample / 6.)
                 icell->Real(Sl) = Sl0_c;
         }
         double S = icell->Real(Sl);
@@ -879,9 +881,10 @@ void TwoPhaseFlow::setBoundaryConditions()
         face.Barycenter(x);
 
         // Upper boundary - hardcoded
-        if(fabs(x[2]-0.012) < 1e-7){
-            double r = (x[0]-0.006)*(x[0]-0.006) + (x[1]-0.006)*(x[1]-0.006);
+        if(fabs(x[2]-Lsample) < 1e-7){
+            double r = (x[0]-Rsample)*(x[0]-Rsample) + (x[1]-Rsample)*(x[1]-Rsample);
             r = sqrt(r);
+            //printf("r = %lf\n", r);
             if(r <= injectRadius){
                 inflowFaces.push_back(face);
                 inflowCells.push_back(face.BackCell());
@@ -895,7 +898,7 @@ void TwoPhaseFlow::setBoundaryConditions()
 
         // Lower boundary - hardcoded
         if(fabs(x[2]-0.0) < 1e-7){
-            double r = (x[0]-0.006)*(x[0]-0.006) + (x[1]-0.006)*(x[1]-0.006);
+            double r = (x[0]-Rsample)*(x[0]-Rsample) + (x[1]-Rsample)*(x[1]-Rsample);
             r = sqrt(r);
             if(r <= injectRadius){
                 //std::cout << "Bottom boundary face " << face.GlobalID() << ", z = " << x[2] << std::endl;
@@ -905,7 +908,7 @@ void TwoPhaseFlow::setBoundaryConditions()
         }
     }
 
-    iclsize = mesh->Integrate(static_cast<double>(inflowCells.size()));
+    iclsize = mesh->Integrate(iclsize);//static_cast<double>(inflowCells.size()));
     inflowArea = mesh->Integrate(inflowArea);
     if(rank == 0){
         std::cout << "Number of inflow cells " << iclsize << std::endl;
