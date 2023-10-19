@@ -59,7 +59,7 @@ void TwoPhaseFlow::setDefaultParams()
      g       = 9.81;
      c_f     = 1./22e9;
      c_phi   = 9e-3*1e-6;
-     Pt      = 43e6;
+     Pt      = 15e6;
      P0      = 1e5;
      gamma   = 0.028*1e-6;
      vg_a    = 1.0;
