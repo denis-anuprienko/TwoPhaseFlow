@@ -54,11 +54,12 @@ void TwoPhaseFlow::setDefaultParams()
      K0      = 1e-18;
      mul     = 1.e-3;
      mug     = 1.e-3;
-     rhol    = 7.0e2;
+     rhol0   = 7.0e2;
      rhog    = 7.0e2;
      g       = 9.81;
      c_f     = 1./22e9;
      c_phi   = 9e-3*1e-6;
+     c_w     = 1e-6;
      Pt      = 15e6;
      P0      = 1e5;
      gamma   = 0.028*1e-6;
@@ -118,7 +119,9 @@ void TwoPhaseFlow::readParams(std::string path)
         if(firstword == "T")
             iss >> T;
         if(firstword == "rhol")
-            iss >> rhol;
+            iss >> rhol0;
+        if(firstword == "c_w")
+            iss >> c_w;
         if(firstword == "rhog")
             iss >> rhog;
         if(firstword == "mul")
@@ -176,7 +179,7 @@ void TwoPhaseFlow::readParams(std::string path)
     times[T_IO] += Timer() - t;
 
     if(rank == 0)
-        printf("mu/k/rho RATIO = %e\n", mul/K0/rhol);
+        printf("mu/k/rho RATIO = %e\n", mul/K0/rhol0);
 }
 
 void TwoPhaseFlow::setMesh()
@@ -533,7 +536,7 @@ variable TwoPhaseFlow::get_Sl(variable Pcc)
 {
     if(Pcc.GetValue() < 0.0)
         return 1.0;
-    return pow(1.0 + pow(vg_a/rhol/g*Pcc, vg_n), -vg_m);
+    return pow(1.0 + pow(vg_a/rhol0/g*Pcc, vg_n), -vg_m);
 }
 
 variable TwoPhaseFlow::get_Poro(variable PfP, double PfPn, double PhiPn)
@@ -561,7 +564,7 @@ variable TwoPhaseFlow::get_Pc(variable S)
         std::cout << "Bad saturation " << S.GetValue() << std::endl;
         exit(1);
     }
-    return rhol*9.81/vg_a * pow(pow(S,-1./vg_m) - 1., 1./vg_n);
+    return rhol0*9.81/vg_a * pow(pow(S,-1./vg_m) - 1., 1./vg_n);
 }
 
 void TwoPhaseFlow::get_Kr(variable S, variable &Krl, variable &Krg)
@@ -583,6 +586,12 @@ void TwoPhaseFlow::get_Kr(variable S, variable &Krl, variable &Krg)
     //Krg = pow(1.-S,2.0)*(1.-S*S);
 }
 
+variable TwoPhaseFlow::get_rhol(variable pl)
+{
+    double Pl0 = Pg0 - get_Pc(Sl0).GetValue();
+    return rhol0 + c_w * (pl - Pl0);
+}
+
 void TwoPhaseFlow::assembleResidual()
 {
     double t = Timer();
@@ -591,7 +600,7 @@ void TwoPhaseFlow::assembleResidual()
         Cell cellP = icell->getAsCell();
 
         // Values needed for accumulation part
-        variable SP, PfP, PlP, massL, massG, PhiP;
+        variable SP, PfP, PlP, massL, massG, PhiP, rholP;
         double SPn, massL_old, massG_old, PhiPn;
         SPn = cellP.Real(Sl_old);
 
@@ -608,14 +617,15 @@ void TwoPhaseFlow::assembleResidual()
             PlP = varPg(cellP) - get_Pc(SP);
         }
 
+        rholP = get_rhol(PlP);
 
         PfP           = SP * PlP + (1.-SP) * varPg(cellP);
         PhiPn         = cellP.Real(Phi_old);
         PhiP          = get_Poro(PfP, cellP.Real(Pf_old), cellP.Real(Phi_old));
 
-        massL         = rhol *     SP   * PhiP;//varPhi(cellP);
+        massL         = rholP *     SP   * PhiP;//varPhi(cellP);
         massG         = rhog * (1.-SP)  * PhiP;//varPhi(cellP);
-        massL_old     = rhol *     SPn  * cellP.Real(Phi_old);
+        massL_old     = rholP.GetValue() * SPn  * cellP.Real(Phi_old);
         massG_old     = rhog * (1.-SPn) * cellP.Real(Phi_old);
 
         R[varX.Index(cellP)]   = (massL - massL_old)/dt;// * V;
@@ -656,7 +666,7 @@ void TwoPhaseFlow::assembleResidual()
 
                     double coef = face.Real(TCoeff);
 
-                    ql = -rhol*Krl*KP*Ke/mul * coef * (PlP - PlBC);
+                    ql = -get_rhol(PlBC)*Krl*KP*Ke/mul * coef * (PlP - PlBC);
 					face.Real(fluxFaceL) = ql.GetValue();
                 }
 
@@ -698,7 +708,7 @@ void TwoPhaseFlow::assembleResidual()
 
                     double coef = face.Real(TCoeff);
 
-                    ql = -rhol*Krl*KP*Ke/mul * coef * (PlP - PlBC);
+                    ql = -get_rhol(PlBC)*Krl*KP*Ke/mul * coef * (PlP - PlBC);
                     qg = -rhog*Krg*KP*Ke/mug * coef * (varPg(cellP) - PgBC);
 
 					face.Real(fluxFaceL) = ql.GetValue();
@@ -761,6 +771,11 @@ void TwoPhaseFlow::assembleResidual()
 
                 K = 2.0 * KP*KN / (KP + KN);
 
+                variable rhol =
+                        (PlP-PlN).GetValue() > 0 ?
+                            rholP
+                          : get_rhol(PlN);
+
                 ql = -rhol*Krl*K*Ke/mul * coef * (PlP - PlN);
                 qg = -rhog*Krg*K*Ke/mug * coef * (varPg(cellP) - varPg(cellN));
 
@@ -791,7 +806,7 @@ void TwoPhaseFlow::setInitialConditions()
 
         double x[3];
         icell->Barycenter(x);
-        icell->Real(Ref) = mul/rhol/K0*inflowFluxL/inflowArea*(x[2]-Lsample) + outflowPresF;
+        //icell->Real(Ref) = mul/rhol/K0*inflowFluxL/inflowArea*(x[2]-Lsample) + outflowPresF;
 
         //if(!loadMesh)
             icell->Real(Perm) = K0;// * (0.5 + rand()/(double)RAND_MAX);
@@ -857,11 +872,11 @@ void TwoPhaseFlow::setInitialConditions()
             double S = icell->Real(Sl);
             icell->Real(Pl) = icell->Real(Pg) - (get_Pc(S)).GetValue();
             icell->Real(Pc) = icell->Real(Pg) - icell->Real(Pl);
-            mass += S * icell->Real(Phi) * icell->Volume();
+            mass += get_rhol(icell->Real(Pl)).GetValue() * S * icell->Real(Phi) * icell->Volume();
         }
     }
 
-    mass = rhol * mesh->Integrate(mass);
+    mass = mesh->Integrate(mass);
     mesh->ExchangeData(Perm, CELL);
     mesh->ExchangeData(Pg, CELL);
     mesh->ExchangeData(Pl, CELL);
@@ -966,10 +981,10 @@ void TwoPhaseFlow::countMass()
     double mass_new = 0.0;
     for(auto icell = mesh->BeginCell(); icell != mesh->EndCell(); icell++){
         if(icell->GetStatus() == Element::Ghost) continue;
-
-        mass_new += icell->Real(Sl) * icell->Real(Phi) * icell->Volume();
+        double rhol = (get_rhol(icell->Real(Pl))).GetValue();
+        mass_new += rhol * icell->Real(Sl) * icell->Real(Phi) * icell->Volume();
     }
-    mass_new = rhol * mesh->Integrate(mass_new);
+    mass_new = mesh->Integrate(mass_new);
     if(rank == 0){
         std::cout << "Mass change is " << mass_new-mass;
         std::cout << " (" << (mass_new-mass)/mass*1e2 << "%)" << std::endl;
@@ -1182,7 +1197,7 @@ void TwoPhaseFlow::runSimulation()
     S->SetParameter("gmres_substeps","0");
     S->SetParameter("condition_estimation","1");
     S->SetParameter("schwartz_overlap","3");
-    S->SetParameter("drop_tolerance","1e-2");
+    S->SetParameter("drop_tolerance","1e-1");
 
     int nt = static_cast<int>(T/dt);
     dt = 1e-1;
@@ -1249,6 +1264,7 @@ void TwoPhaseFlow::runSimulation()
                 double t = f.Real(TCoeff);
                 double bcL = f.RealArray(BCval)[BCAT_L];
                 double bcG = f.RealArray(BCval)[BCAT_G];
+                variable rhol = get_rhol(c.Real(Pl));
                 double fluxL = -(k * rhol * Krl / mul * t * (bcL - c.Real(Pl))).GetValue();
                 double fluxG = -(k * rhol * Krl / mul * t * (bcG - c.Real(Pg))).GetValue();
                 Q += fluxL + fluxG;

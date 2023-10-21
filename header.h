@@ -42,12 +42,13 @@ private:
     double K0;     // Initial intrinsic permeability, m^2
     double mul;    // Liquid dynamic viscoity, Pa*s
     double mug;    // Gas    dynamic viscoity, Pa*s
-    double rhol;   // Liquid density, kg/m^3
+	double rhol0;  // Reference liquid density, kg/m^3
     double rhog;   // Gas    density, kg/m^3
     double rhos;   // Solid density, kg/m^3
     double g;      // m/s^2
     double c_f;    // parameter from van Noort and Yarushina, 1/Pa
     double c_phi;  // parameter from van Noort and Yarushina, 1/Pa
+	double c_w;    // liquid compressibility factor
     double Pt;     // Confining pressure, Pa
     double P0;     // Atmospheric pressure, Pa
     double gamma;  // Exponent factor for permeability function
@@ -143,6 +144,8 @@ public:
     double get_Poro(double PfP, double PfPn, double PhiPn);
     variable get_Ke(variable PfP);
     void get_Kr(variable S, variable &Krl, variable &Krg);
+	void get_mobility(const Face &f, variable &lam_l, variable &lam_g);
+	variable get_rhol(variable pl);
     void assembleResidual();
     void copyTagReal(Tag Dest, Tag Src, ElementType mask);
     void setMesh();
