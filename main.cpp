@@ -86,6 +86,7 @@ void TwoPhaseFlow::setDefaultParams()
      loadMesh = false;
      Nx = Ny = Nz = 4;
      saveSol = true;
+     fileField3D = "";
 }
 
 void TwoPhaseFlow::readParams(std::string path)
@@ -174,6 +175,8 @@ void TwoPhaseFlow::readParams(std::string path)
             iss >> Nz;
         if(firstword == "save_solution")
             iss >> saveSol;
+        if (firstword == "field3d")
+            iss >> fileField3D;
     }
     //std::cout << "Pdnstr " << outflowPresL << std::endl;
     times[T_IO] += Timer() - t;
@@ -411,6 +414,7 @@ void TwoPhaseFlow::initTags()
 	Phitmp    = mesh->CreateTag("Phi_tmp",               DATA_REAL,    CELL, false, 1);
 	BCtype    = mesh->CreateTag("BCtype",                DATA_INTEGER, FACE, FACE,  3);
 	BCval     = mesh->CreateTag("BCval",                 DATA_REAL,    FACE, FACE,  3);
+    Heterog = mesh->CreateTag("Heterogeneity", DATA_REAL, CELL, false, 1);
 
     // Some tags don't need to be printed
     X.SetPrint(false);
@@ -798,7 +802,16 @@ void TwoPhaseFlow::setInitialConditions()
     mass = 0.0;
     srand(time(nullptr));
 
-    Tag Ref = mesh->CreateTag("REF", DATA_REAL, CELL, NONE, 1);
+    Tag Ref = mesh->CreateTag("REF", DATA_REAL, CELL, NONE, 1); 
+    double* f3d = nullptr;
+    if (fileField3D != "") {
+        const double F3D_SIZE = 1000000;
+        f3d = new double[F3D_SIZE];
+        FILE *fd_f3d = fopen("C:/Users/anuprienko/3d_field.vtk", "r");
+        for (int i = 0; i < F3D_SIZE; i++)
+            fscanf(fd_f3d, "%lf ", &(f3d[i]));
+    }
+    double dx = 2 * Rsample / Nx, dy = 2 * Rsample / Ny, dz = Lsample / Nz;
 
     for(auto icell = mesh->BeginCell(); icell != mesh->EndCell(); icell++){
         if(icell->GetStatus() == Element::Ghost) continue;
@@ -810,6 +823,19 @@ void TwoPhaseFlow::setInitialConditions()
 
         //if(!loadMesh)
             icell->Real(Perm) = K0;// * (0.5 + rand()/(double)RAND_MAX);
+
+            double hetval = 1.0;
+            if (fileField3D != "") {
+                int ind_x = static_cast<int>(x[0] / dx / Nx * 100);
+                int ind_y = static_cast<int>(x[1] / dy / Ny * 100);
+                int ind_z = static_cast<int>(x[2] / dz / Nz * 100);
+                int ind = (ind_x * 100 + ind_y) * 100 + ind_z;
+                if (ind % 10000 == 1)
+                    std::cout << "ind = " << ind << std::endl;
+                hetval = f3d[ind];
+            }
+            icell->Real(Heterog) = hetval;
+            icell->Real(Perm) = exp(hetval) * K0;
 
         icell->Real(Pg) = Pg0;
         icell->Real(Sl) = Sl0;

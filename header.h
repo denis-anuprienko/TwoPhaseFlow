@@ -75,6 +75,7 @@ private:
     std::string meshName;     // mesh file location
     int Nx, Ny, Nz;           // dimensions for Cartesian mesh to generate
     bool saveSol;             // if we save solution as (P)VTK
+    std::string fileField3D;  // 3D heterogeneity field file - not use if empty
 
     // Mesh
     Mesh *mesh;
@@ -106,6 +107,8 @@ private:
 
 	Tag BCtype;    // BC type: Neumann, Dirichlet
 	Tag BCval;     // BC value: pressure or flux
+
+    Tag Heterog;   
 
     // Autodiff things
     Automatizator *aut;
