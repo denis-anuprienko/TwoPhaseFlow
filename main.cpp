@@ -536,32 +536,32 @@ void TwoPhaseFlow::initAutodiff()
     times[T_INIT] += Timer() - t;
 }
 
-variable TwoPhaseFlow::get_Sl(variable Pcc)
+variable TwoPhaseFlow::get_Sl(const Cell &c, variable Pcc)
 {
     if(Pcc.GetValue() < 0.0)
         return 1.0;
     return pow(1.0 + pow(vg_a/rhol0/g*Pcc, vg_n), -vg_m);
 }
 
-variable TwoPhaseFlow::get_Poro(variable PfP, double PfPn, double PhiPn)
+variable TwoPhaseFlow::get_Poro(const Cell& c, variable PfP, double PfPn, double PhiPn)
 {
     //return PhiPn + c_phi * (PfP - PfPn);
     return PhiPn / (1. - c_phi /* /PfP */ * (PfP - PfPn));
     //return phi0 * pow(PfP/0.1e6, -c_phi);
 }
 
-double TwoPhaseFlow::get_Poro(double PfP, double PfPn, double PhiPn)
+double TwoPhaseFlow::get_Poro(const Cell& c, double PfP, double PfPn, double PhiPn)
 {
-    return get_Poro(variable(PfP), PfPn, PhiPn).GetValue();
+    return get_Poro(c, variable(PfP), PfPn, PhiPn).GetValue();
 }
 
-variable TwoPhaseFlow::get_Ke(variable PfP)
+variable TwoPhaseFlow::get_Ke(const Cell& c, variable PfP)
 {
     return exp(-gamma*(Pt - PfP - 0.1e6));
     //return pow(PfP/0.1e6, -c_phi);
 }
 
-variable TwoPhaseFlow::get_Pc(variable S)
+variable TwoPhaseFlow::get_Pc(const Cell& c, variable S)
 {
     if(S.GetValue() < 0.0 || S.GetValue() > 1.0){
         mesh->Save("err" + outpExt);
@@ -571,7 +571,7 @@ variable TwoPhaseFlow::get_Pc(variable S)
     return rhol0*9.81/vg_a * pow(pow(S,-1./vg_m) - 1., 1./vg_n);
 }
 
-void TwoPhaseFlow::get_Kr(variable S, variable &Krl, variable &Krg)
+void TwoPhaseFlow::get_Kr(const Cell& c, variable S, variable &Krl, variable &Krg)
 {
     double s = S.GetValue();
 
@@ -592,7 +592,7 @@ void TwoPhaseFlow::get_Kr(variable S, variable &Krl, variable &Krg)
 
 variable TwoPhaseFlow::get_rhol(variable pl)
 {
-    double Pl0 = Pg0 - get_Pc(Sl0).GetValue();
+    double Pl0 = 8E6;// Pg0 - get_Pc(Sl0).GetValue();
     return rhol0 + c_w * (pl - Pl0);
 }
 
@@ -613,19 +613,19 @@ void TwoPhaseFlow::assembleResidual()
         if(cellP.Integer(PV) == PV_PRES){
             PlP = varX(cellP);
             variable Pcc = varPg(cellP) - PlP;
-            SP = get_Sl(Pcc);
+            SP = get_Sl(cellP, Pcc);
         }
         else{
             // Saturation formulation, X is Sl
             SP = varX(cellP);
-            PlP = varPg(cellP) - get_Pc(SP);
+            PlP = varPg(cellP) - get_Pc(cellP, SP);
         }
 
         rholP = get_rhol(PlP);
 
         PfP           = SP * PlP + (1.-SP) * varPg(cellP);
         PhiPn         = cellP.Real(Phi_old);
-        PhiP          = get_Poro(PfP, cellP.Real(Pf_old), cellP.Real(Phi_old));
+        PhiP          = get_Poro(cellP, PfP, cellP.Real(Pf_old), cellP.Real(Phi_old));
 
         massL         = rholP *     SP   * PhiP;//varPhi(cellP);
         massG         = rhog * (1.-SP)  * PhiP;//varPhi(cellP);
@@ -640,7 +640,7 @@ void TwoPhaseFlow::assembleResidual()
         //R[varPhi.Index(cellP)] *= V;
 
         variable KrlP, KrgP;
-        get_Kr(SP, KrlP, KrgP);
+        get_Kr(cellP, SP, KrlP, KrgP);
 
         double KP = cellP.Real(Perm);
 
@@ -664,9 +664,9 @@ void TwoPhaseFlow::assembleResidual()
                     std::cout << "Face with Dirichlet BC for liquid" << std::endl;
                     double PlBC = face.RealArray(BCval)[BCAT_L];
                     variable Krl, Krg;
-                    get_Kr(SP, Krl, Krg);
+                    get_Kr(cellP, SP, Krl, Krg);
                     //variable Ke = exp(-gamma*(Pt - PfP - 0.1e6));
-                    variable Ke = get_Ke(PfP);
+                    variable Ke = get_Ke(cellP, PfP);
 
                     double coef = face.Real(TCoeff);
 
@@ -704,10 +704,10 @@ void TwoPhaseFlow::assembleResidual()
                     variable PlBC, PgBC;
                     // Pf = S*Pl + (1-S)*Pg = Pg + S*(Pl-Pg) = Pg - S*Pc
                     //SP = 1.0;//
-                    PgBC = PBC + SP*get_Pc(SP);
+                    PgBC = PBC + SP*get_Pc(cellP, SP);
                     PlBC = (PBC - (1.-SP)*PgBC)/SP;
                     variable Krl, Krg;
-                    get_Kr(SP, Krl, Krg);
+                    get_Kr(cellP, SP, Krl, Krg);
                     variable Ke = exp(-gamma*(Pt - PfP - 0.1e6));
 
                     double coef = face.Real(TCoeff);
@@ -741,11 +741,11 @@ void TwoPhaseFlow::assembleResidual()
                 if(cellN.Integer(PV) == PV_PRES){
                     PlN = varX(cellN);
                     variable Pcc = varPg(cellN) - PlN;
-                    SN = get_Sl(Pcc);
+                    SN = get_Sl(cellN, Pcc);
                 }
                 else{ // X is Sl
                     SN = varX(cellN);
-                    PlN = varPg(cellN) - get_Pc(SN);
+                    PlN = varPg(cellN) - get_Pc(cellN, SN);
                 }
                 PfN = SN*PlN + (1.-SN)*varPg(cellN);
 
@@ -755,7 +755,7 @@ void TwoPhaseFlow::assembleResidual()
                 //Ke = 1.0;
 
                 variable KrlN, KrgN;
-                get_Kr(SN, KrlN, KrgN);
+                get_Kr(cellN, SN, KrlN, KrgN);
 
                 //Krl = 0.5 * (KrlP + KrlN);
                 //Krg = 0.5 * (KrgP + KrgN);
@@ -848,9 +848,9 @@ void TwoPhaseFlow::setInitialConditions()
                 icell->Real(Sl) = Sl0_c;
         }
         double S = icell->Real(Sl);
-        icell->Real(Pc) = (get_Pc(S)).GetValue();
+        icell->Real(Pc) = (get_Pc(icell->self(), S)).GetValue();
         icell->Real(Pl) = 8e6;//icell->Real(Pg) - icell->Real(Pc);
-        icell->Real(Pg) = icell->Real(Pl) + (get_Pc(S)).GetValue();
+        icell->Real(Pg) = icell->Real(Pl) + (get_Pc(icell->self(), S)).GetValue();
         icell->Real(Pf) = S * icell->Real(Pl) + (1.-S) * icell->Real(Pg);
         icell->Real(Phi) = phi0;
 
@@ -896,7 +896,7 @@ void TwoPhaseFlow::setInitialConditions()
             icell->Real(Perm) = 1e-10*icell->RealArray(KK)[0];
             icell->Real(Phi) = icell->Real(PORO);
             double S = icell->Real(Sl);
-            icell->Real(Pl) = icell->Real(Pg) - (get_Pc(S)).GetValue();
+            icell->Real(Pl) = icell->Real(Pg) - (get_Pc(icell->self(), S)).GetValue();
             icell->Real(Pc) = icell->Real(Pg) - icell->Real(Pl);
             mass += get_rhol(icell->Real(Pl)).GetValue() * S * icell->Real(Phi) * icell->Volume();
         }
@@ -1131,19 +1131,19 @@ bool TwoPhaseFlow::makeTimeStep()
                         break;
                     }
 
-                    cell.Real(Pc) = get_Pc(Snew).GetValue();
+                    cell.Real(Pc) = get_Pc(cell, Snew).GetValue();
                     cell.Real(Pl) = cell.Real(Pg) - cell.Real(Pc);
                     cell.Real(Sl) = Snew;
                 }
                 else{
                     cell.Real(Pl) -= w*sol[varX.Index(cell)];
                     cell.Real(Pc) = cell.Real(Pg) - cell.Real(Pl);
-                    cell.Real(Sl) = get_Sl(cell.Real(Pc)).GetValue();
+                    cell.Real(Sl) = get_Sl(cell, cell.Real(Pc)).GetValue();
                 }
                 //cell.Real(Phi) -= sol[varPhi.Index(cell)];
                 double S = cell.Real(Sl);
                 cell.Real(Pf) = S*cell.Real(Pl) + (1.-S)*cell.Real(Pg);
-                cell.Real(Phi) = get_Poro(cell.Real(Pf), cell.Real(Pf_old), cell.Real(Phi_old));//cell.Real(Phi_old) + c_phi/cell.Real(Pf)*(cell.Real(Pf)-cell.Real(Pf_old));
+                cell.Real(Phi) = get_Poro(cell, cell.Real(Pf), cell.Real(Pf_old), cell.Real(Phi_old));//cell.Real(Phi_old) + c_phi/cell.Real(Pf)*(cell.Real(Pf)-cell.Real(Pf_old));
                 if(cell.Real(Phi) > 1e5){
                     //printf("Bad porosity %e at cell %d\n", cell.Real(Phi), cell.LocalID());
                     return false;
@@ -1284,8 +1284,8 @@ void TwoPhaseFlow::runSimulation()
                 Face f = iface->getAsFace();
                 Cell c = f.BackCell();
                 variable Krl, Krg;
-                get_Kr(c.Real(Sl), Krl,Krg);
-                variable Ke = get_Ke(c.Real(Pf));
+                get_Kr(c, c.Real(Sl), Krl,Krg);
+                variable Ke = get_Ke(c, c.Real(Pf));
                 double k = c.Real(Perm);
                 double t = f.Real(TCoeff);
                 double bcL = f.RealArray(BCval)[BCAT_L];

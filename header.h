@@ -141,12 +141,12 @@ public:
     void cleanMesh();
     void initTags();
     void computeTPFAcoeff();
-    variable get_Sl(variable Pcc);
-    variable get_Pc(variable S);
-    variable get_Poro(variable PfP, double PfPn, double PhiPn);
-    double get_Poro(double PfP, double PfPn, double PhiPn);
-    variable get_Ke(variable PfP);
-    void get_Kr(variable S, variable &Krl, variable &Krg);
+    variable get_Sl(const Cell &c, variable Pcc);
+    variable get_Pc(const Cell &c, variable S);
+    variable get_Poro(const Cell &c, variable PfP, double PfPn, double PhiPn);
+    double get_Poro(const Cell &c, double PfP, double PfPn, double PhiPn);
+    variable get_Ke(const Cell &c, variable PfP);
+    void get_Kr(const Cell &c, variable S, variable &Krl, variable &Krg);
 	void get_mobility(const Face &f, variable &lam_l, variable &lam_g);
 	variable get_rhol(variable pl);
     void assembleResidual();
